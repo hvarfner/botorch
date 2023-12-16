@@ -888,6 +888,37 @@ def gen_value_function_initial_conditions(
         X=X_rnd, Y=Y_rnd, n=num_restarts, eta=options.get("eta", 2.0)
     )
 
+def gen_optimal_location_initial_conditions(
+    acq_function: AcquisitionFunction,
+    bounds: Tensor,
+    num_restarts: int,
+    raw_samples: int,
+    model: Model,
+    fixed_features: Optional[Dict[int, float]] = None,
+    options: Optional[Dict[str, Union[bool, float, int]]] = None,
+):
+    options = options or {}
+    frac_random: float = options.get("frac_random", 0.1)
+    if not 0 < frac_random < 1:
+        raise ValueError(
+            f"frac_random must take on values in (0,1). Value: {frac_random}"
+        )
+    q_aug = acq_function.get_augmented_q_batch_size(q=q)
+    suggested_optima = get_suggestions(acq_function)
+    offset_suggestions = sample_truncated_normal_perturbations(suggested_optima)
+    # TODO: Avoid unnecessary computation by not generating all candidates
+    ics = gen_batch_initial_conditions(
+        acq_function=acq_function,
+        bounds=bounds,
+        q=q_aug,
+        num_restarts=num_restarts,
+        raw_samples=raw_samples,
+        fixed_features=fixed_features,
+        options=options,
+        inequality_constraints=inequality_constraints,
+        equality_constraints=equality_constraints,
+    )
+
 
 def initialize_q_batch(X: Tensor, Y: Tensor, n: int, eta: float = 1.0) -> Tensor:
     r"""Heuristic for selecting initial conditions for candidate generation.
@@ -1297,3 +1328,14 @@ def is_nonnegative(acq_function: AcquisitionFunction) -> bool:
             multi_objective.monte_carlo.qNoisyExpectedHypervolumeImprovement,
         ),
     )
+
+
+def get_suggestions(acq_function: AcquisitionFunction, num_suggestions: int = 256) -> Optional[Tensor]:
+    if isinstance(acq_function, (
+        qJointEntropySearch,
+        JointSelfCorrecting,
+    )):
+        num_optima = acq_function.optimal_outputs.numel()
+        suggestions = acq_function.optimal_inputs.reshape(num_optima, -1)
+
+        return suggestions

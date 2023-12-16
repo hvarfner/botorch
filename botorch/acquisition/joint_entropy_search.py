@@ -32,7 +32,6 @@ from botorch import settings
 from botorch.acquisition.acquisition import AcquisitionFunction, MCSamplerMixin
 from botorch.acquisition.objective import PosteriorTransform
 
-from botorch.models.fully_bayesian import SaasFullyBayesianSingleTaskGP
 from botorch.models.gp_regression import MIN_INFERRED_NOISE_LEVEL
 from botorch.models.model import Model
 
@@ -132,8 +131,6 @@ class qJointEntropySearch(AcquisitionFunction, MCSamplerMixin):
         # and the optimal outputs have shapes num_optima x [num_models if FB] x 1 x 1
         # The third dimension equaling 1 is required to get one optimum per model,
         # which raises a BotorchTensorDimensionWarning.
-        if isinstance(model, SaasFullyBayesianSingleTaskGP):
-            raise NotImplementedError(FULLY_BAYESIAN_ERROR_MSG)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore")
             with fantasize_flag():
@@ -193,8 +190,7 @@ class qJointEntropySearch(AcquisitionFunction, MCSamplerMixin):
         return res
 
     def _compute_lower_bound_information_gain(
-        self, X: Tensor, return_parts: bool = False
-    ) -> Tensor:
+        self, X: Tensor) -> Tensor:
         r"""Evaluates the lower bound information gain at the design points `X`.
 
         Args:
