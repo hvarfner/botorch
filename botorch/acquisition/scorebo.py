@@ -81,7 +81,7 @@ class SelfCorrectingBayesianOptimization(
                 self.model.condition_on_observations(
                     X=self.model.transform_inputs(self.optimal_inputs),
                     Y=self.optimal_outputs,
-                    noise=torch.full_like(g
+                    noise=torch.full_like(
                         self.optimal_outputs, MIN_INFERRED_NOISE_LEVEL),
                 )
             )
