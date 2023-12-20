@@ -91,14 +91,15 @@ class SelfCorrectingBayesianOptimization(
         else:
             self.conditional_model = self.model
             
-        if estimation_type not in ["LB", "MC"]:
+        # Currently only supports LB (lower bound) estimation, will add MC later on
+        if estimation_type not in ["LB"]:
             raise ValueError(f"Estimation type {estimation_type} does not exist.")
         self.estimation_type = estimation_type
         
         # the default number of MC samples (512) are too many when doing FB modeling.
         if distance_metric not in DISTANCE_METRICS.keys():
             raise ValueError(
-                f"Distance metric need to be one of " f"{list(DISTANCE_METRICS.keys())}"
+                f"Distance metric need to be one of {list(DISTANCE_METRICS.keys())}"
             )
         self.distance = DISTANCE_METRICS[distance_metric]
         self.set_X_pending(X_pending)
@@ -109,7 +110,6 @@ class SelfCorrectingBayesianOptimization(
         # unsqueeze a second dim to accomodate the posterior pass
         posterior = self.conditional_model.posterior(
             X.unsqueeze(MCMC_DIM), observation_noise=True)
-        breakpoint()
         cond_means = posterior.mean
         marg_mean = cond_means.mean(dim=MCMC_DIM, keepdim=True)
         cond_variances = posterior.variance

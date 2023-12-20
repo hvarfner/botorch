@@ -18,72 +18,16 @@ from botorch.posteriors.posterior import Posterior
 from botorch.sampling.base import MCSampler
 from botorch.sampling.normal import SobolQMCNormalSampler
 
+from botorch.utils.stat_distance import (
+    wasserstein_distance,
+    kl_divergence,
+    hellinger_distance,
+)    
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
 
 
 SAMPLE_DIM = -4
-
-
-def wasserstein_distance(
-    p_mean: Tensor, q_mean: Tensor, p_var: Tensor, q_var: Tensor
-) -> Tensor:
-    """Computes
-
-    Args:
-        p_mean (Tensor): [batch_shape] x sample_shape tensor of means of first dist
-        q_mean (Tensor): [batch_shape] x sample_shape tensor of variances of first dist
-        p_var (Tensor): [batch_shape] x sample_shape tensor of means of second dist
-        q_var (Tensor): [batch_shape] x sample_shape tensor of variances of second dist
-
-    Returns:
-        Tensor: The wasserstein distance between the gaussian distributions p and q
-    """
-    mean_term = torch.pow(p_mean - q_mean, 2)
-    # rounding errors (rarely) occur, where the var term is ~-1e-16
-    var_term = (p_var + q_var - 2 * torch.sqrt(p_var * q_var)).clamp_min(0)
-    return torch.sqrt(mean_term + var_term)
-
-
-def kl_divergence(
-    p_mean: Tensor, q_mean: Tensor, p_var: Tensor, q_var: Tensor
-) -> Tensor:
-    """Computes
-
-    Args:
-        p_mean (Tensor): [batch_shape] x sample_shape tensor of means of first dist
-        q_mean (Tensor): [batch_shape] x sample_shape tensor of variances of first dist
-        p_var (Tensor): [batch_shape] x sample_shape tensor of means of second dist
-        q_var (Tensor): [batch_shape] x sample_shape tensor of variances of second dist
-
-    Returns:
-        Tensor: The kl divergence between the gaussian distributions p and q
-    """
-    kl_first_term = torch.log(torch.sqrt(p_var / q_var))
-    kl_second_term = 0.5 * (torch.pow(p_mean - q_mean, 2) + q_var) / p_var
-    return kl_first_term + kl_second_term - 0.5
-
-
-def hellinger_distance(
-    p_mean: Tensor, q_mean: Tensor, p_var: Tensor, q_var: Tensor
-) -> Tensor:
-    """Computes
-
-    Args:
-        p_mean (Tensor): [batch_shape] x sample_shape tensor of means of first dist
-        q_mean (Tensor): [batch_shape] x sample_shape tensor of variances of first dist
-        p_var (Tensor): [batch_shape] x sample_shape tensor of means of second dist
-        q_var (Tensor): [batch_shape] x sample_shape tensor of variances of second dist
-
-    Returns:
-        Tensor: The hellinger distance between the gaussian distributions p and q
-    """
-    exp_term = -0.25 * torch.pow(p_mean - q_mean, 2) / (p_var + q_var)
-    mult_term = torch.sqrt(2 * torch.sqrt(p_var * q_var) / (p_var + q_var))
-    return torch.sqrt(1 - mult_term * torch.exp(exp_term))
-
-
-# TODO move to utils/distance_metrics
 DISTANCE_METRICS = {
     "hellinger": hellinger_distance,
     "wasserstein": wasserstein_distance,
@@ -170,7 +114,7 @@ class BayesianActiveLearningByDisagreement(
         model: SaasFullyBayesianSingleTaskGP,
         X_pending: Optional[Tensor] = None,
         posterior_transform: Optional[PosteriorTransform] = None,
-        estimation_type: str = "MC",
+        estimation_type: str = "LB",
         sampler: Optional[MCSampler] = None,
         num_samples: int = 64,
     ) -> None:
@@ -187,22 +131,21 @@ class BayesianActiveLearningByDisagreement(
             ValueError: _description_
         """
         super().__init__(model)
-        if estimation_type not in ["MC", "LB"]:
+        if estimation_type not in ["LB"]:
             raise ValueError(f"Estimation type {estimation_type} does not exist.")
-        self.estimation_type = estimation_type
         self.set_X_pending(X_pending)
         # the default number of MC samples (512) are too many when doing FB modeling.
         if sampler is None:
             sampler = SobolQMCNormalSampler(sample_shape=torch.Size([num_samples]))
         MCSamplerMixin.__init__(self, sampler=sampler)
 
+        if estimation_type == "LB":
+            self.acq_method = self._compute_lower_bound_information_gain
+
     @concatenate_pending_points
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
-        if self.estimation_type == "LB":
-            return self._compute_lower_bound_information_gain(X)
-        elif self.estimation_type == "MC":
-            return self._compute_monte_carlo_information_gain(X)
+        return self.acq_method(X)
 
     def _compute_lower_bound_information_gain(self, X: Tensor) -> Tensor:
         posterior = self.model.posterior(X, observation_noise=True)
@@ -211,21 +154,7 @@ class BayesianActiveLearningByDisagreement(
         bald = torch.log(marg_variance) - torch.log(cond_variances)
 
         return bald.squeeze(-1).squeeze(-1)
-
-    def _compute_monte_carlo_information_gain(self, X: Tensor) -> Tensor:
-        posterior = self.model.posterior(X, observation_noise=True)
-        samples = self.get_posterior_samples(posterior)
-        samples_log_prob = (
-            posterior.mvn.log_prob(samples.squeeze(-1)).unsqueeze(-1).unsqueeze(-1)
-        )
-        breakpoint()
-        normal = Normal(
-            torch.zeros(1, device=X.device, dtype=X.dtype),
-            torch.ones(1, device=X.device, dtype=X.dtype),
-        )
-
-        return bald.squeeze(-1).squeeze(-1)
-
+    
 
 class StatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
     def __init__(
@@ -251,7 +180,8 @@ class StatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
             ValueError: _description_
         """
         super().__init__(model)
-        if estimation_type not in ["LB", "MC"]:
+        # Currently only supports LB (lower bound) estimation, will add MC later on
+        if estimation_type not in ["LB"]:
             raise ValueError(f"Estimation type {estimation_type} does not exist.")
         self.estimation_type = estimation_type
         self.set_X_pending(X_pending)
