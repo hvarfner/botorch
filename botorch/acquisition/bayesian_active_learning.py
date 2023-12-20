@@ -11,6 +11,7 @@ from typing import Optional
 
 import torch
 from botorch.acquisition.acquisition import AcquisitionFunction, MCSamplerMixin
+from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.fully_bayesian import MCMC_DIM, SaasFullyBayesianSingleTaskGP
 from botorch.models.model import Model
 from botorch.posteriors.posterior import Posterior
@@ -117,7 +118,7 @@ class FullyBayesianAcquisitionFunction(AcquisitionFunction):
 class BayesianVarianceReduction(FullyBayesianAcquisitionFunction):
     def __init__(
         self,
-        model: Model,
+        model: SaasFullyBayesianSingleTaskGP,
         X_pending: Optional[Tensor] = None,
     ) -> None:
         """_summary_
@@ -139,8 +140,9 @@ class BayesianVarianceReduction(FullyBayesianAcquisitionFunction):
 class BayesianQueryByComittee(FullyBayesianAcquisitionFunction):
     def __init__(
         self,
-        model: Model,
+        model: SaasFullyBayesianSingleTaskGP,
         X_pending: Optional[Tensor] = None,
+        posterior_transform: Optional[PosteriorTransform] = None,
     ) -> None:
         """
 
@@ -165,8 +167,9 @@ class BayesianActiveLearningByDisagreement(
 ):
     def __init__(
         self,
-        model: Model,
+        model: SaasFullyBayesianSingleTaskGP,
         X_pending: Optional[Tensor] = None,
+        posterior_transform: Optional[PosteriorTransform] = None,
         estimation_type: str = "MC",
         sampler: Optional[MCSampler] = None,
         num_samples: int = 64,
@@ -227,8 +230,9 @@ class BayesianActiveLearningByDisagreement(
 class StatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
     def __init__(
         self,
-        model: Model,
+        model: SaasFullyBayesianSingleTaskGP,
         X_pending: Optional[Tensor] = None,
+        posterior_transform: Optional[PosteriorTransform] = None,
         distance_metric: str = "hellinger",
         estimation_type: str = "LB",
         sampler: Optional[MCSampler] = None,
