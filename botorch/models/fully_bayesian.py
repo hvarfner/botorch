@@ -552,10 +552,10 @@ class SaasFullyBayesianSingleTaskGP(ExactGP, BatchedMultiOutputGPyTorchModel, Fa
         Args:
             X: A `batch_shape x num_samples x d`-dim Tensor, where `d` is
                 the dimension of the feature space and `batch_shape` is the number of
-                 sampled models.
+                sampled models.
             Y: A `batch_shape x num_samples x 1`-dim Tensor, where `d` is
                 the dimension of the feature space and `batch_shape` is the number of
-                 sampled models.
+                sampled models.
 
         Returns:
             BatchedMultiOutputGPyTorchModel: A fully bayesian model conditioned on

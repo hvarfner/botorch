@@ -23,6 +23,7 @@ from botorch import settings
 from botorch.acquisition import analytic, monte_carlo, multi_objective
 from botorch.acquisition.acquisition import AcquisitionFunction
 from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
+from botorch.acquisition.joint_entropy_search import qJointEntropySearch
 from botorch.acquisition.knowledge_gradient import (
     _get_value_function,
     qKnowledgeGradient,
@@ -32,6 +33,7 @@ from botorch.acquisition.multi_objective.hypervolume_knowledge_gradient import (
     qHypervolumeKnowledgeGradient,
     qMultiFidelityHypervolumeKnowledgeGradient,
 )
+from botorch.acquisition.predictive_entropy_search import qPredictiveEntropySearch
 from botorch.exceptions.errors import BotorchTensorDimensionError, UnsupportedError
 from botorch.exceptions.warnings import (
     BadInitialCandidatesWarning,
@@ -1333,6 +1335,7 @@ def is_nonnegative(acq_function: AcquisitionFunction) -> bool:
 def get_suggestions(acq_function: AcquisitionFunction, num_suggestions: int = 256) -> Optional[Tensor]:
     if isinstance(acq_function, (
         qJointEntropySearch,
+        qPredictiveEntropySearch,
         JointSelfCorrecting,
     )):
         num_optima = acq_function.optimal_outputs.numel()
