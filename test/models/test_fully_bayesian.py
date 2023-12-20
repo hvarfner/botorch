@@ -807,9 +807,13 @@ class TestFullyBayesianSingleTaskGP(BotorchTestCase):
             sampler = SobolQMCNormalSampler(torch.Size([fantasy_size]))
             fantasy_model = model.fantasize(fantasy_X, sampler, 
                                             observation_noise=fantasy_Yvar)
+            
             self.assertEqual(
                 fantasy_model.train_inputs[0].shape,
                 torch.Size([fantasy_size, num_models, num_train + num_cond, num_dims])
+            )
+            self.assertEqual(fantasy_model.posterior(train_X).mean.shape,
+                torch.Size([fantasy_size, num_models, num_train, 1])
             )
 
     def test_bisect(self):
