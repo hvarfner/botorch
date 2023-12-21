@@ -88,6 +88,7 @@ from botorch.acquisition.objective import (
 )
 from botorch.acquisition.preference import AnalyticExpectedUtilityOfBestOption
 from botorch.acquisition.risk_measures import RiskMeasureMCObjective
+from botorch.acquisition.scorebo import SelfCorrectingBayesianOptimization
 from botorch.acquisition.utils import (
     compute_best_feasible_objective,
     expand_trace_observations,
@@ -1542,6 +1543,38 @@ def construct_inputs_qJES(
         "optimal_inputs": optimal_inputs,
         "optimal_outputs": optimal_outputs,
         "condition_noiseless": condition_noiseless,
+        "maximize": maximize,
+        "X_pending": X_pending,
+        "estimation_type": estimation_type,
+        "num_samples": num_samples,
+    }
+    return inputs
+
+@acqf_input_constructor(SelfCorrectingBayesianOptimization)
+def construct_inputs_SCoreBO(
+    model: Model,
+    bounds: List[Tuple[float, float]],
+    num_optima: int = 8,
+    maximize: bool = True,
+    distance_metric: str = "hellinger",
+    X_pending: Optional[Tensor] = None,
+    estimation_type: str = "LB",
+    num_samples: int = 64,
+):
+    dtype = model.train_targets.dtype
+    # the number of optima are per model
+    optimal_inputs, optimal_outputs = get_optimal_samples(
+        model=model,
+        bounds=torch.as_tensor(bounds, dtype=dtype).T,
+        num_optima=num_optima,
+        maximize=maximize,
+    )
+
+    inputs = {
+        "model": model,
+        "optimal_inputs": optimal_inputs,
+        "optimal_outputs": optimal_outputs,
+        "distance_metric": distance_metric,
         "maximize": maximize,
         "X_pending": X_pending,
         "estimation_type": estimation_type,

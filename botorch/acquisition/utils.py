@@ -489,6 +489,7 @@ def get_optimal_samples(
     raw_samples: int = 1024,
     num_restarts: int = 20,
     maximize: bool = True,
+    use_suggestions: bool = True,
 ) -> Tuple[Tensor, Tensor]:
     """Draws sample paths from the posterior and maximizes the samples using GD.
 
@@ -508,11 +509,16 @@ def get_optimal_samples(
 
     """
     paths = draw_matheron_paths(model, sample_shape=torch.Size([num_optima]))
+    if use_suggestions:
+        suggestions = prune_inferior_points(model, model.train_inputs[0])
+    else:
+        suggestions = None
     optimal_inputs, optimal_outputs = optimize_posterior_samples(
         paths,
         bounds=bounds,
         raw_samples=raw_samples,
         num_restarts=num_restarts,
         maximize=maximize,
+        suggestions=suggestions,
     )
     return optimal_inputs, optimal_outputs

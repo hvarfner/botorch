@@ -862,10 +862,11 @@ def sparse_to_dense_constraints(
 def optimize_posterior_samples(
     paths: SamplePath,
     bounds: Tensor,
-    candidates: Optional[Tensor] = None,
     raw_samples: Optional[int] = 1024,
-    num_restarts: int = 20,
+    num_restarts: int = 10,
     maximize: bool = True,
+    suggestions: Optional[Tensor] = None,
+    suggestions_sigma: Optional[float] = 0.025,
     **kwargs: Any,
 ) -> Tuple[Tensor, Tensor]:
     r"""Cheaply maximizes posterior samples by random querying followed by vanilla
@@ -874,11 +875,11 @@ def optimize_posterior_samples(
     Args:
         paths: Random Fourier Feature-based sample paths from the GP
         bounds: The bounds on the search space.
-        candidates: A priori good candidates (typically previous design points)
-            which acts as extra initial guesses for the optimization routine.
         raw_samples: The number of samples with which to query the samples initially.
         num_restarts: The number of points selected for gradient-based optimization.
         maximize: Boolean indicating whether to maimize or minimize
+        suggestions: A priori good candidates (typically previous design points)
+            which acts as extra initial guesses for the optimization routine.
 
     Returns:
         A two-element tuple containing:
@@ -886,19 +887,27 @@ def optimize_posterior_samples(
             - f_opt: A `num_optima x [batch_size] x 1`-dim tensor of optimal outputs f*.
     """
     if maximize:
-
         def path_func(x):
             return paths(x)
 
     else:
-
         def path_func(x):
             return -paths(x)
 
     candidate_set = unnormalize(
         SobolEngine(dimension=bounds.shape[1], scramble=True).draw(raw_samples), bounds
     )
-
+    if suggestions is not None:
+        # avoiding circular imports
+        from botorch.optim.initializers import sample_truncated_normal_perturbations
+        perturbed_suggestions = sample_truncated_normal_perturbations(
+            X=suggestions,
+            bounds=bounds,
+            n_discrete_points=raw_samples,
+            sigma=suggestions_sigma,
+        )
+        candidate_set = torch.cat((candidate_set, perturbed_suggestions))
+    
     # queries all samples on all candidates - output shape
     # raw_samples * num_optima * num_models
     candidate_queries = path_func(candidate_set)
