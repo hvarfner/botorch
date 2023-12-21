@@ -319,7 +319,7 @@ def gen_batch_initial_conditions(
         suggested_num_samples = floor(raw_samples * min(
             0.9999, options.get("sample_around_suggestions_fraction", 0.5)))
         raw_samples = raw_samples - suggested_num_samples
-        suggestions = options['suggestions']
+        suggestions = options['suggestions'].reshape(-1, bounds.shape[1])
 
     if sample_around_best and equality_constraints:
         raise UnsupportedError(
@@ -936,9 +936,10 @@ def gen_optimal_location_initial_conditions(
     # in case of fully bayesian, optimal inputs is 3D. We reshape to 2D
     suggested_optima = getattr(acq_function, "optimal_inputs")
 
-    # suggested_optima is None if we run max-value-only SCoreBO
-    if suggested_optima is not None:
-        options['suggestions'] = suggested_optima.reshape(-1, dim)
+    # in case of multiobjective, it is instead called "pareto_sets" (consider renaming)
+    if suggested_optima is None:
+        suggested_optima = getattr(acq_function, "pareto_sets")
+
     # other arguments 'sample_around_suggestions_sigma'
     # other arguments 'sample_around_suggestions_fraction'
 
@@ -1359,6 +1360,9 @@ def is_nonnegative(acq_function: AcquisitionFunction) -> bool:
             monte_carlo.qExpectedImprovement,
             monte_carlo.qNoisyExpectedImprovement,
             monte_carlo.qProbabilityOfImprovement,
+            qPredictiveEntropySearch,
+            qJointEntropySearch,
+            SelfCorrectingBayesianOptimization,
             multi_objective.analytic.ExpectedHypervolumeImprovement,
             multi_objective.monte_carlo.qExpectedHypervolumeImprovement,
             multi_objective.monte_carlo.qNoisyExpectedHypervolumeImprovement,
