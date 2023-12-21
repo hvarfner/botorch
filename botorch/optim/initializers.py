@@ -15,7 +15,7 @@ References
 from __future__ import annotations
 
 import warnings
-from math import ceil
+from math import ceil, floor
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import torch
@@ -34,6 +34,7 @@ from botorch.acquisition.multi_objective.hypervolume_knowledge_gradient import (
     qMultiFidelityHypervolumeKnowledgeGradient,
 )
 from botorch.acquisition.predictive_entropy_search import qPredictiveEntropySearch
+from botorch.acquisition.scorebo import SelfCorrectingBayesianOptimization
 from botorch.exceptions.errors import BotorchTensorDimensionError, UnsupportedError
 from botorch.exceptions.warnings import (
     BadInitialCandidatesWarning,
@@ -310,6 +311,16 @@ def gen_batch_initial_conditions(
         )
     options = options or {}
     sample_around_best = options.get("sample_around_best", False)
+    has_suggestions = options.get("suggestions") is not None and options.get(
+            "sample_around_suggestions_fraction", 0.5) > 0
+    if has_suggestions:
+        # ensures the total number of raw samples remains the same
+        # even when there are suggestions
+        suggested_num_samples = floor(raw_samples * min(
+            0.9999, options.get("sample_around_suggestions_fraction", 0.5)))
+        raw_samples = raw_samples - suggested_num_samples
+        suggestions = options['suggestions']
+
     if sample_around_best and equality_constraints:
         raise UnsupportedError(
             "Option 'sample_around_best' is not supported when equality"
@@ -392,6 +403,25 @@ def gen_batch_initial_conditions(
                         ],
                         dim=0,
                     )
+            # sample points around suggestions (i.e. sampled optima in ES-like methods)
+            if has_suggestions:
+                n_suggested_points = suggested_num_samples * q
+                X_sugg_rnd = sample_truncated_normal_perturbations(
+                    X=suggestions,
+                    n_discrete_points=n_suggested_points,
+                    sigma=options.get("sample_around_suggestions_sigma", 1e-2),
+                    bounds=bounds,
+                )
+                X_rnd = torch.cat(
+                    [
+                        X_rnd,
+                        X_sugg_rnd.view(
+                            suggested_num_samples, q, bounds.shape[-1]
+                        ).cpu(),
+                    ],
+                    dim=0,
+                )
+
             X_rnd = fix_features(X_rnd, fixed_features=fixed_features)
             if fixed_X_fantasies is not None:
                 if (d_f := fixed_X_fantasies.shape[-1]) != (d_r := X_rnd.shape[-1]):
@@ -546,7 +576,7 @@ def gen_one_shot_kg_initial_conditions(
         inequality_constraints=inequality_constraints,
         equality_constraints=equality_constraints,
     )
-
+    
     # sampling from the optimizers
     n_value = int((1 - frac_random) * (q_aug - q))  # number of non-random ICs
     eta = options.get("eta", 2.0)
@@ -893,26 +923,29 @@ def gen_value_function_initial_conditions(
 def gen_optimal_location_initial_conditions(
     acq_function: AcquisitionFunction,
     bounds: Tensor,
+    q: int,
     num_restarts: int,
     raw_samples: int,
-    model: Model,
     fixed_features: Optional[Dict[int, float]] = None,
+    inequality_constraints: Optional[List[Tuple[Tensor, Tensor, float]]] = None,
+    equality_constraints: Optional[List[Tuple[Tensor, Tensor, float]]] = None,
     options: Optional[Dict[str, Union[bool, float, int]]] = None,
 ):
     options = options or {}
-    frac_random: float = options.get("frac_random", 0.1)
-    if not 0 < frac_random < 1:
-        raise ValueError(
-            f"frac_random must take on values in (0,1). Value: {frac_random}"
-        )
-    q_aug = acq_function.get_augmented_q_batch_size(q=q)
-    suggested_optima = get_suggestions(acq_function)
-    offset_suggestions = sample_truncated_normal_perturbations(suggested_optima)
-    # TODO: Avoid unnecessary computation by not generating all candidates
+    dim = bounds.shape[1]
+    # in case of fully bayesian, optimal inputs is 3D. We reshape to 2D
+    suggested_optima = getattr(acq_function, "optimal_inputs")
+
+    # suggested_optima is None if we run max-value-only SCoreBO
+    if suggested_optima is not None:
+        options['suggestions'] = suggested_optima.reshape(-1, dim)
+    # other arguments 'sample_around_suggestions_sigma'
+    # other arguments 'sample_around_suggestions_fraction'
+
     ics = gen_batch_initial_conditions(
         acq_function=acq_function,
         bounds=bounds,
-        q=q_aug,
+        q=q,
         num_restarts=num_restarts,
         raw_samples=raw_samples,
         fixed_features=fixed_features,
@@ -920,6 +953,7 @@ def gen_optimal_location_initial_conditions(
         inequality_constraints=inequality_constraints,
         equality_constraints=equality_constraints,
     )
+    return ics
 
 
 def initialize_q_batch(X: Tensor, Y: Tensor, n: int, eta: float = 1.0) -> Tensor:
@@ -1330,15 +1364,3 @@ def is_nonnegative(acq_function: AcquisitionFunction) -> bool:
             multi_objective.monte_carlo.qNoisyExpectedHypervolumeImprovement,
         ),
     )
-
-
-def get_suggestions(acq_function: AcquisitionFunction, num_suggestions: int = 256) -> Optional[Tensor]:
-    if isinstance(acq_function, (
-        qJointEntropySearch,
-        qPredictiveEntropySearch,
-        JointSelfCorrecting,
-    )):
-        num_optima = acq_function.optimal_outputs.numel()
-        suggestions = acq_function.optimal_inputs.reshape(num_optima, -1)
-
-        return suggestions

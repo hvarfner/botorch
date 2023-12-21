@@ -27,6 +27,7 @@ from botorch.acquisition.multi_objective.hypervolume_knowledge_gradient import (
     qHypervolumeKnowledgeGradient,
 )
 from botorch.acquisition.predictive_entropy_search import qPredictiveEntropySearch
+from botorch.acquisition.scorebo import SelfCorrectingBayesianOptimization
 from botorch.exceptions import InputDataError, UnsupportedError
 from botorch.exceptions.warnings import OptimizationWarning
 from botorch.generation.gen import gen_candidates_scipy, TGenCandidates
@@ -35,6 +36,7 @@ from botorch.optim.initializers import (
     gen_batch_initial_conditions,
     gen_one_shot_hvkg_initial_conditions,
     gen_one_shot_kg_initial_conditions,
+    gen_optimal_location_initial_conditions,
     TGenInitialConditions,
 )
 from botorch.optim.stopping import ExpMAStoppingCriterion
@@ -54,6 +56,8 @@ INIT_OPTION_KEYS = {
     "sample_around_best",
     "sample_around_best_sigma",
     "sample_around_best_prob_perturb",
+    "sample_around_suggestions_fraction",
+    "sample_around_suggestions_sigma",
     "seed",
     "thinning",
 }
@@ -137,8 +141,11 @@ class OptimizeAcqfInputs:
             return gen_one_shot_kg_initial_conditions
         elif isinstance(self.acq_function, qHypervolumeKnowledgeGradient):
             return gen_one_shot_hvkg_initial_conditions
-        elif isinstance(self.acq_function, 
-            (qJointEntropySearch, qPredictiveEntropySearch)
+        elif isinstance(self.acq_function, (
+            qJointEntropySearch, 
+            qPredictiveEntropySearch, 
+            SelfCorrectingBayesianOptimization,
+            )
         ):
             return gen_optimal_location_initial_conditions
         return gen_batch_initial_conditions
