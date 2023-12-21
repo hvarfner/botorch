@@ -1550,6 +1550,7 @@ def construct_inputs_qJES(
     }
     return inputs
 
+
 @acqf_input_constructor(SelfCorrectingBayesianOptimization)
 def construct_inputs_SCoreBO(
     model: Model,

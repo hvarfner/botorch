@@ -141,11 +141,13 @@ class OptimizeAcqfInputs:
             return gen_one_shot_kg_initial_conditions
         elif isinstance(self.acq_function, qHypervolumeKnowledgeGradient):
             return gen_one_shot_hvkg_initial_conditions
-        elif isinstance(self.acq_function, (
-            qJointEntropySearch, 
-            qPredictiveEntropySearch, 
-            SelfCorrectingBayesianOptimization,
-            )
+        elif isinstance(
+            self.acq_function,
+            (
+                qJointEntropySearch,
+                qPredictiveEntropySearch,
+                SelfCorrectingBayesianOptimization,
+            ),
         ):
             return gen_optimal_location_initial_conditions
         return gen_batch_initial_conditions

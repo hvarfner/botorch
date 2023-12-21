@@ -311,15 +311,19 @@ def gen_batch_initial_conditions(
         )
     options = options or {}
     sample_around_best = options.get("sample_around_best", False)
-    has_suggestions = options.get("suggestions") is not None and options.get(
-            "sample_around_suggestions_fraction", 0.5) > 0
+    has_suggestions = (
+        options.get("suggestions") is not None
+        and options.get("sample_around_suggestions_fraction", 0.5) > 0
+    )
     if has_suggestions:
         # ensures the total number of raw samples remains the same
         # even when there are suggestions
-        suggested_num_samples = floor(raw_samples * min(
-            0.9999, options.get("sample_around_suggestions_fraction", 0.5)))
+        suggested_num_samples = floor(
+            raw_samples
+            * min(0.9999, options.get("sample_around_suggestions_fraction", 0.5))
+        )
         raw_samples = raw_samples - suggested_num_samples
-        suggestions = options['suggestions'].reshape(-1, bounds.shape[1])
+        suggestions = options["suggestions"].reshape(-1, bounds.shape[1])
 
     if sample_around_best and equality_constraints:
         raise UnsupportedError(
@@ -576,7 +580,7 @@ def gen_one_shot_kg_initial_conditions(
         inequality_constraints=inequality_constraints,
         equality_constraints=equality_constraints,
     )
-    
+
     # sampling from the optimizers
     n_value = int((1 - frac_random) * (q_aug - q))  # number of non-random ICs
     eta = options.get("eta", 2.0)
@@ -920,6 +924,7 @@ def gen_value_function_initial_conditions(
         X=X_rnd, Y=Y_rnd, n=num_restarts, eta=options.get("eta", 2.0)
     )
 
+
 def gen_optimal_location_initial_conditions(
     acq_function: AcquisitionFunction,
     bounds: Tensor,
@@ -932,7 +937,6 @@ def gen_optimal_location_initial_conditions(
     options: Optional[Dict[str, Union[bool, float, int]]] = None,
 ):
     options = options or {}
-    dim = bounds.shape[1]
     # in case of fully bayesian, optimal inputs is 3D. We reshape to 2D
     suggested_optima = getattr(acq_function, "optimal_inputs")
 

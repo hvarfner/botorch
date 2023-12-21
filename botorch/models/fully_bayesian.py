@@ -310,7 +310,9 @@ class SaasPyroModel(PyroModel):
         return mean_module, covar_module, likelihood
 
 
-class SaasFullyBayesianSingleTaskGP(ExactGP, BatchedMultiOutputGPyTorchModel, FantasizeMixin):
+class SaasFullyBayesianSingleTaskGP(
+    ExactGP, BatchedMultiOutputGPyTorchModel, FantasizeMixin
+):
     r"""A fully Bayesian single-task GP model with the SAAS prior.
 
     This model assumes that the inputs have been normalized to [0, 1]^d and that
@@ -561,18 +563,18 @@ class SaasFullyBayesianSingleTaskGP(ExactGP, BatchedMultiOutputGPyTorchModel, Fa
             BatchedMultiOutputGPyTorchModel: A fully bayesian model conditioned on
               given observations. The returned model has `batch_shape` copies of the
               training data in case of identical observations (and `batch_shape`
-              training datasets otherwise). 
+              training datasets otherwise).
         """
         if X.ndim == 2 and Y.ndim == 2:
-            # To avoid an error in GPyTorch when inferring the batch dimension, we must add
-            # the explicit batch shape here. The result will be that the conditioned model
+            # To avoid an error in GPyTorch when inferring the batch dimension, we add
+            # the explicit batch shape here. The result is that the conditioned model
             # will have 'batch_shape' copies of the training data.
             X = X.repeat(self.batch_shape + (1, 1))
             Y = Y.repeat(self.batch_shape + (1, 1))
 
         elif X.ndim < Y.ndim:
-            # this happens when fantasizing - one set of training points and multiple Y's.
-            # In that case, we need to duplicate the training data to enable correct batch
+            # this happens when fantasizing - one set of training data and multiple Y.
+            # In that case, we duplicate the training data to enable correct batch
             # size inference in gpytorch.
             X = X.repeat(*(Y.shape[:-2] + (1, 1)))
 

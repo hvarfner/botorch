@@ -189,8 +189,7 @@ class qJointEntropySearch(AcquisitionFunction, MCSamplerMixin):
             )
         return res
 
-    def _compute_lower_bound_information_gain(
-        self, X: Tensor) -> Tensor:
+    def _compute_lower_bound_information_gain(self, X: Tensor) -> Tensor:
         r"""Evaluates the lower bound information gain at the design points `X`.
 
         Args:

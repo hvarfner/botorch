@@ -132,17 +132,20 @@ class TestFullyBayesianSingleTaskGP(BotorchTestCase):
             torch.manual_seed(0)
             cond_X = 5 + 5 * torch.rand(num_models, num_cond, 4, **tkwargs)
             cond_Y = 10 + torch.sin(cond_X[..., :1])
-            cond_Yvar = None if infer_noise else 0.1 * torch.ones(
-                cond_Y.shape, **tkwargs)
+            cond_Yvar = (
+                None if infer_noise else 0.1 * torch.ones(cond_Y.shape, **tkwargs)
+            )
         return cond_X, cond_Y, cond_Yvar
-    
+
     def _get_unnormalized_fantasy_data(
         self: int, num_cond: int, infer_noise: bool, **tkwargs
     ):
         with torch.random.fork_rng():
             torch.manual_seed(0)
             fantasy_X = 5 + 5 * torch.rand(num_cond, 4, **tkwargs)
-            fantasy_Yvar = None if infer_noise else 0.1 * torch.ones((num_cond, 1), **tkwargs)
+            fantasy_Yvar = (
+                None if infer_noise else 0.1 * torch.ones((num_cond, 1), **tkwargs)
+            )
         return fantasy_X, fantasy_Yvar
 
     def _get_mcmc_samples(
@@ -692,9 +695,9 @@ class TestFullyBayesianSingleTaskGP(BotorchTestCase):
             # condition on different observations per model to obtain num_models sets
             # of training data
             cond_X, cond_Y, cond_Yvar = self._get_unnormalized_condition_data(
-                num_models=num_models, 
-                num_cond=num_cond, 
-                infer_noise=infer_noise, 
+                num_models=num_models,
+                num_cond=num_cond,
+                infer_noise=infer_noise,
                 **tkwargs
             )
             model = SaasFullyBayesianSingleTaskGP(
@@ -730,7 +733,6 @@ class TestFullyBayesianSingleTaskGP(BotorchTestCase):
             # the batch shape of the condition model is added during conditioning
             self.assertEqual(cond_model.batch_shape, torch.Size([num_models]))
 
-            
             # condition on identical sets of data (i.e. one set) for all models
             # i.e, with no batch shape. This infers the batch shape.
             cond_X_nobatch, cond_Y_nobatch = cond_X[0], cond_Y[0]
@@ -751,7 +753,8 @@ class TestFullyBayesianSingleTaskGP(BotorchTestCase):
             # will still have a batch size
             model.posterior(train_X)
             cond_model = model.condition_on_observations(
-                cond_X_nobatch, cond_Y_nobatch, noise=cond_Yvar)
+                cond_X_nobatch, cond_Y_nobatch, noise=cond_Yvar
+            )
             self.assertEqual(
                 cond_model.train_inputs[0].shape,
                 torch.Size([num_models, num_train + num_cond, num_dims]),
@@ -760,7 +763,8 @@ class TestFullyBayesianSingleTaskGP(BotorchTestCase):
             # test repeated conditining
             repeat_cond_X = cond_X + 5
             repeat_cond_model = cond_model.condition_on_observations(
-                repeat_cond_X, cond_Y, noise=cond_Yvar)
+                repeat_cond_X, cond_Y, noise=cond_Yvar
+            )
             self.assertEqual(
                 repeat_cond_model.train_inputs[0].shape,
                 torch.Size([num_models, num_train + 2 * num_cond, num_dims]),
@@ -769,7 +773,8 @@ class TestFullyBayesianSingleTaskGP(BotorchTestCase):
             # test repeated conditioning without a batch size
             repeat_cond_X_nobatch = cond_X_nobatch + 10
             repeat_cond_model2 = repeat_cond_model.condition_on_observations(
-                repeat_cond_X_nobatch, cond_Y_nobatch, noise=cond_Yvar)
+                repeat_cond_X_nobatch, cond_Y_nobatch, noise=cond_Yvar
+            )
             self.assertEqual(
                 repeat_cond_model2.train_inputs[0].shape,
                 torch.Size([num_models, num_train + 3 * num_cond, num_dims]),
@@ -805,15 +810,17 @@ class TestFullyBayesianSingleTaskGP(BotorchTestCase):
             )
             model.load_mcmc_samples(mcmc_samples)
             sampler = SobolQMCNormalSampler(torch.Size([fantasy_size]))
-            fantasy_model = model.fantasize(fantasy_X, sampler, 
-                                            observation_noise=fantasy_Yvar)
-            
+            fantasy_model = model.fantasize(
+                fantasy_X, sampler, observation_noise=fantasy_Yvar
+            )
+
             self.assertEqual(
                 fantasy_model.train_inputs[0].shape,
-                torch.Size([fantasy_size, num_models, num_train + num_cond, num_dims])
+                torch.Size([fantasy_size, num_models, num_train + num_cond, num_dims]),
             )
-            self.assertEqual(fantasy_model.posterior(train_X).mean.shape,
-                torch.Size([fantasy_size, num_models, num_train, 1])
+            self.assertEqual(
+                fantasy_model.posterior(train_X).mean.shape,
+                torch.Size([fantasy_size, num_models, num_train, 1]),
             )
 
     def test_bisect(self):

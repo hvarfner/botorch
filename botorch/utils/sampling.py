@@ -887,10 +887,12 @@ def optimize_posterior_samples(
             - f_opt: A `num_optima x [batch_size] x 1`-dim tensor of optimal outputs f*.
     """
     if maximize:
+
         def path_func(x):
             return paths(x)
 
     else:
+
         def path_func(x):
             return -paths(x)
 
@@ -900,6 +902,7 @@ def optimize_posterior_samples(
     if suggestions is not None:
         # avoiding circular imports
         from botorch.optim.initializers import sample_truncated_normal_perturbations
+
         perturbed_suggestions = sample_truncated_normal_perturbations(
             X=suggestions,
             bounds=bounds,
@@ -907,7 +910,7 @@ def optimize_posterior_samples(
             sigma=suggestions_sigma,
         )
         candidate_set = torch.cat((candidate_set, perturbed_suggestions))
-    
+
     # queries all samples on all candidates - output shape
     # raw_samples * num_optima * num_models
     candidate_queries = path_func(candidate_set)

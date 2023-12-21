@@ -14,15 +14,14 @@ from botorch.acquisition.acquisition import AcquisitionFunction, MCSamplerMixin
 from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.fully_bayesian import MCMC_DIM, SaasFullyBayesianSingleTaskGP
 from botorch.models.model import Model
-from botorch.posteriors.posterior import Posterior
 from botorch.sampling.base import MCSampler
 from botorch.sampling.normal import SobolQMCNormalSampler
 
 from botorch.utils.stat_distance import (
-    wasserstein_distance,
-    kl_divergence,
     hellinger_distance,
-)    
+    kl_divergence,
+    wasserstein_distance,
+)
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
 
@@ -154,7 +153,7 @@ class BayesianActiveLearningByDisagreement(
         bald = torch.log(marg_variance) - torch.log(cond_variances)
 
         return bald.squeeze(-1).squeeze(-1)
-    
+
 
 class StatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
     def __init__(

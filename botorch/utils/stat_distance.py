@@ -58,4 +58,3 @@ def hellinger_distance(
     exp_term = -0.25 * torch.pow(p_mean - q_mean, 2) / (p_var + q_var)
     mult_term = torch.sqrt(2 * torch.sqrt(p_var * q_var) / (p_var + q_var))
     return torch.sqrt(1 - mult_term * torch.exp(exp_term))
-
