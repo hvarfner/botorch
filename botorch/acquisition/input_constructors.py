@@ -41,6 +41,12 @@ from botorch.acquisition.analytic import (
     ProbabilityOfImprovement,
     UpperConfidenceBound,
 )
+from botorch.acquisition.bayesian_active_learning import (
+    qBayesianActiveLearningByDisagreement,
+    qBayesianQueryByComittee,
+    qBayesianVarianceReduction,
+    qStatisticalDistanceActiveLearning
+)
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
 from botorch.acquisition.joint_entropy_search import qJointEntropySearch
@@ -1551,6 +1557,43 @@ def construct_inputs_qJES(
     return inputs
 
 
+@acqf_input_constructor(
+    qBayesianActiveLearningByDisagreement,
+    qBayesianQueryByComittee,
+    qBayesianVarianceReduction,
+)
+def construct_inputs_BAL(
+    model: Model,
+    X_pending: Optional[Tensor] = None,
+    posterior_transform: Optional[PosteriorTransform] = None,
+):
+    inputs = {
+        "model": model,
+        "X_pending": X_pending,
+        "posterior_transform": posterior_transform,
+    }
+    return inputs
+
+
+@acqf_input_constructor(qStatisticalDistanceActiveLearning)
+def construct_inputs_SAL(
+    model: Model,
+    distance_metric: str = "hellinger",
+    X_pending: Optional[Tensor] = None,
+    estimation_type: str = "LB",
+    num_samples: int = 64,
+    posterior_transform: Optional[PosteriorTransform] = None,
+):
+    inputs = {
+        "model": model,
+        "distance_metric": distance_metric,
+        "X_pending": X_pending,
+        "estimation_type": estimation_type,
+        "num_samples": num_samples,
+        "posterior_transform": posterior_transform,
+    }
+    return inputs
+
 @acqf_input_constructor(qSelfCorrectingBayesianOptimization)
 def construct_inputs_SCoreBO(
     model: Model,
@@ -1561,6 +1604,7 @@ def construct_inputs_SCoreBO(
     X_pending: Optional[Tensor] = None,
     estimation_type: str = "LB",
     num_samples: int = 64,
+    posterior_transform: Optional[PosteriorTransform] = None,
 ):
     dtype = model.train_targets.dtype
     # the number of optima are per model
@@ -1580,5 +1624,6 @@ def construct_inputs_SCoreBO(
         "X_pending": X_pending,
         "estimation_type": estimation_type,
         "num_samples": num_samples,
+        "posterior_transform": posterior_transform
     }
     return inputs
