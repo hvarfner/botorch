@@ -87,8 +87,8 @@ class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
     def test_scorebo(self):
         torch.manual_seed(1)
         tkwargs = {"device": self.device}
-        estimation_types = "LB" # MC not implemented yet (the other option)
-        distance_metrics = ("helliinger", "wasserstein", "kl_divergence")
+        estimation_types = ["LB"] # MC not implemented yet (the other option)
+        distance_metrics = ("hellinger", "wasserstein", "kl_divergence")
         num_objectives = 1
         num_models = 3
         for (
@@ -125,27 +125,35 @@ class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
                 **tkwargs,
             )
 
-            num_samples = 20
-
-            optimal_inputs = torch.rand(num_samples, input_dim, **tkwargs)
+            num_optimal_samples = 5
+            optimal_inputs = torch.rand(
+                num_optimal_samples,
+                num_models,
+                input_dim,
+                **tkwargs
+            )
 
             # SCoreBO can work with only max-value, so we're testing that too
             if only_maxval:
                 optimal_inputs = None
-            optimal_outputs = torch.rand(num_samples, num_objectives, **tkwargs)
+            optimal_outputs = torch.rand(
+                num_optimal_samples,
+                num_models,
+                num_objectives,
+                **tkwargs
+            )
 
             # test acquisition
             X_pending_list = [None, torch.rand(2, input_dim, **tkwargs)]
             for i in range(len(X_pending_list)):
                 X_pending = X_pending_list[i]
-                
+
                 acq = SelfCorrectingBayesianOptimization(
                     model=model,
                     optimal_inputs=optimal_inputs,
                     optimal_outputs=optimal_outputs,
                     distance_metric=distance_metric,
                     estimation_type=estimation_type,
-                    num_samples=64,
                     X_pending=X_pending,
                     maximize=maximize,
                 )
@@ -159,9 +167,12 @@ class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
                 ]
 
                 for j in range(len(test_Xs)):
+                    acq_X = acq.forward(test_Xs[j])
                     acq_X = acq(test_Xs[j])
                     # assess shape
                     self.assertTrue(acq_X.shape == test_Xs[j].shape[:-2])
+
+                    print(acq_X.shape)
 
         with self.assertRaises(ValueError):
             acq = SelfCorrectingBayesianOptimization(
@@ -173,7 +184,6 @@ class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
                 X_pending=X_pending,
                 maximize=maximize,
             )
-            acq_X = acq(test_Xs[j])
 
         with self.assertRaises(ValueError):
             acq = SelfCorrectingBayesianOptimization(
@@ -185,7 +195,6 @@ class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
                 X_pending=X_pending,
                 maximize=maximize,
             )
-            acq_X = acq(test_Xs[j])
 
         # Support with non-fully bayesian models is not possible. Thus, we
         # throw an error.
