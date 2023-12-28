@@ -137,7 +137,7 @@ class GaussianMixturePosterior(GPyTorchPosterior):
         if self._mixture_covariance_matrix is None:
             num_mcmc_samples = self.mean.shape[MCMC_DIM]
             t1 = self._covariance_matrix.sum(dim=MCMC_DIM) / num_mcmc_samples
-            mean_diff = self._mean - self.mixture_mean
+            mean_diff = self._mean - self.mixture_mean.unsqueeze(MCMC_DIM)
             t2 = torch.matmul(mean_diff, mean_diff.transpose(-1, -2)
                               ).sum(dim=MCMC_DIM) / num_mcmc_samples
             self._mixture_covariance_matrix = t1 + t2
