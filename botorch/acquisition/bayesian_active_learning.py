@@ -17,11 +17,10 @@ from botorch.models.model import Model
 from botorch.sampling.base import MCSampler
 from botorch.sampling.normal import SobolQMCNormalSampler
 
-from botorch.utils.stat_distance import (
+from botorch.utils.metrics import (
     hellinger_distance,
     kl_divergence,
-    wasserstein_distance,
-    hellinger_distance_single,
+    kl_divergence_single
 )
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
@@ -30,7 +29,6 @@ from torch import Tensor
 SAMPLE_DIM = -4
 DISTANCE_METRICS = {
     "hellinger": hellinger_distance,
-    "wasserstein": wasserstein_distance,
     "kl_divergence": kl_divergence,
 }
 
@@ -219,11 +217,13 @@ class qStatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
         cond_means = posterior.mean
         marg_mean = posterior.mixture_mean.unsqueeze(MCMC_DIM)
         cond_covar = posterior.covariance_matrix
+        cond_var = posterior.variance
+        marg_var = posterior.mixture_variance.unsqueeze(MCMC_DIM)
 
         # the mixture variance is squeezed, need it unsqueezed
         marg_covar = posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)
         dist = self.distance(cond_means, marg_mean, cond_covar, marg_covar)
-        
+
         # squeeze output dim - batch dim computed and reduced inside of dist
         # MCMC dim is averaged in decorator
         return dist.squeeze(-1)
