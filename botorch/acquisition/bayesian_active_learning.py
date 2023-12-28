@@ -67,7 +67,7 @@ class BayesianVarianceReduction(FullyBayesianAcquisitionFunction):
         """_summary_
 
         Args:
-            model (Model): _description_
+            model (Model): A SAASFullyBayesianSingleTaskGP.
         """
         super().__init__(model)
 
@@ -105,7 +105,7 @@ class BayesianQueryByComittee(FullyBayesianAcquisitionFunction):
         return var_of_mean.squeeze(-1).squeeze(-1)
 
 
-class BayesianActiveLearningByDisagreement(
+class qBayesianActiveLearningByDisagreement(
     FullyBayesianAcquisitionFunction, MCSamplerMixin
 ):
     def __init__(
@@ -117,10 +117,11 @@ class BayesianActiveLearningByDisagreement(
         sampler: Optional[MCSampler] = None,
         num_samples: int = 64,
     ) -> None:
-        """_summary_
+        """Batch implementation of BALD: https://arxiv.org/pdf/1906.08158.pdf by 
+        Kirsch et. al.
 
         Args:
-            model (Model): _description_
+            model (Model): A SAASFullyBayesianSingleTaskGP.
             X_pending (Optional[Tensor], optional): _description_. Defaults to None.
             estimation_type (str, optional): _description_. Defaults to "MC".
             sampler (Optional[MCSampler], optional): _description_. Defaults to None.
@@ -130,6 +131,7 @@ class BayesianActiveLearningByDisagreement(
             ValueError: _description_
         """
         super().__init__(model)
+        self.posterior_transform = posterior_transform
         if estimation_type not in ["LB"]:
             raise ValueError(f"Estimation type {estimation_type} does not exist.")
         self.set_X_pending(X_pending)
@@ -140,6 +142,9 @@ class BayesianActiveLearningByDisagreement(
 
         if estimation_type == "LB":
             self.acq_method = self._compute_lower_bound_information_gain
+        else:
+            raise ValueError("Only the 'LB' approximation to BALD is currently"
+                             "avaialable")
 
     @concatenate_pending_points
     @t_batch_mode_transform()
@@ -147,12 +152,16 @@ class BayesianActiveLearningByDisagreement(
         return self.acq_method(X)
 
     def _compute_lower_bound_information_gain(self, X: Tensor) -> Tensor:
-        posterior = self.model.posterior(X, observation_noise=True)
-        marg_variance = posterior.mixture_variance.unsqueeze(-1)
+        posterior = self.model.posterior(X, observation_noise=True, 
+                                         posterior_transform=self.posterior_transform)
+        marg_covar = posterior.mixture_covariance_matrix
         cond_variances = posterior.variance
-        bald = torch.log(marg_variance) - torch.log(cond_variances)
+        
+        prev_entropy = torch.logdet(marg_covar).unsqueeze(-1)
+        # squeeze excess dim and mean over q-batch
+        post_ub_entropy = torch.log(cond_variances).squeeze(-1).mean(-1)
 
-        return bald.squeeze(-1).squeeze(-1)
+        return prev_entropy - post_ub_entropy
 
 
 class StatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
@@ -169,7 +178,7 @@ class StatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
         """_summary_
 
         Args:
-            model (Model): _description_
+            model (Model): A SAASFullyBayesianSingleTaskGP.
             X_pending (Optional[Tensor], optional): _description_. Defaults to None.
             distance_metric (str, optional): _description_. Defaults to "MC".
             sampler (Optional[MCSampler], optional): _description_. Defaults to None.
