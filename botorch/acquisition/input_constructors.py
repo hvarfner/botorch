@@ -88,7 +88,7 @@ from botorch.acquisition.objective import (
 )
 from botorch.acquisition.preference import AnalyticExpectedUtilityOfBestOption
 from botorch.acquisition.risk_measures import RiskMeasureMCObjective
-from botorch.acquisition.scorebo import SelfCorrectingBayesianOptimization
+from botorch.acquisition.scorebo import qSelfCorrectingBayesianOptimization
 from botorch.acquisition.utils import (
     compute_best_feasible_objective,
     expand_trace_observations,
@@ -1551,7 +1551,7 @@ def construct_inputs_qJES(
     return inputs
 
 
-@acqf_input_constructor(SelfCorrectingBayesianOptimization)
+@acqf_input_constructor(qSelfCorrectingBayesianOptimization)
 def construct_inputs_SCoreBO(
     model: Model,
     bounds: List[Tuple[float, float]],

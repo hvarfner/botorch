@@ -58,7 +58,3 @@ def hellinger_distance(
     exp_logterm = -0.125 * torch.matmul(L_mean_diff.transpose(-2, -1), L_mean_diff)
     sq_hdist = 1 - (base_logterm + exp_logterm.squeeze(-1)).exp()
     return sq_hdist.sqrt()
-
-
-
-

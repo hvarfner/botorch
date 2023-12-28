@@ -34,7 +34,7 @@ from botorch.acquisition.multi_objective.hypervolume_knowledge_gradient import (
     qMultiFidelityHypervolumeKnowledgeGradient,
 )
 from botorch.acquisition.predictive_entropy_search import qPredictiveEntropySearch
-from botorch.acquisition.scorebo import SelfCorrectingBayesianOptimization
+from botorch.acquisition.scorebo import qSelfCorrectingBayesianOptimization
 from botorch.exceptions.errors import BotorchTensorDimensionError, UnsupportedError
 from botorch.exceptions.warnings import (
     BadInitialCandidatesWarning,
@@ -1366,7 +1366,7 @@ def is_nonnegative(acq_function: AcquisitionFunction) -> bool:
             monte_carlo.qProbabilityOfImprovement,
             qPredictiveEntropySearch,
             qJointEntropySearch,
-            SelfCorrectingBayesianOptimization,
+            qSelfCorrectingBayesianOptimization,
             multi_objective.analytic.ExpectedHypervolumeImprovement,
             multi_objective.monte_carlo.qExpectedHypervolumeImprovement,
             multi_objective.monte_carlo.qNoisyExpectedHypervolumeImprovement,

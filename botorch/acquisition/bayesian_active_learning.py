@@ -20,7 +20,6 @@ from botorch.sampling.normal import SobolQMCNormalSampler
 from botorch.utils.metrics import (
     hellinger_distance,
     kl_divergence,
-    kl_divergence_single
 )
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor

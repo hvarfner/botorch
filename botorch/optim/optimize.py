@@ -27,7 +27,7 @@ from botorch.acquisition.multi_objective.hypervolume_knowledge_gradient import (
     qHypervolumeKnowledgeGradient,
 )
 from botorch.acquisition.predictive_entropy_search import qPredictiveEntropySearch
-from botorch.acquisition.scorebo import SelfCorrectingBayesianOptimization
+from botorch.acquisition.scorebo import qSelfCorrectingBayesianOptimization
 from botorch.exceptions import InputDataError, UnsupportedError
 from botorch.exceptions.warnings import OptimizationWarning
 from botorch.generation.gen import gen_candidates_scipy, TGenCandidates
@@ -146,7 +146,7 @@ class OptimizeAcqfInputs:
             (
                 qJointEntropySearch,
                 qPredictiveEntropySearch,
-                SelfCorrectingBayesianOptimization,
+                qSelfCorrectingBayesianOptimization,
             ),
         ):
             return gen_optimal_location_initial_conditions

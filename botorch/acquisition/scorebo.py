@@ -31,14 +31,14 @@ from botorch.models.gp_regression import MIN_INFERRED_NOISE_LEVEL
 from botorch.models.utils import fantasize as fantasize_flag
 from botorch.sampling import MCSampler
 from botorch.sampling.normal import SobolQMCNormalSampler
-from botorch.utils.transforms import t_batch_mode_transform
+from botorch.utils.transforms import t_batch_mode_transform, concatenate_pending_points
 from torch import Tensor
 
 # The lower bound on the CDF value of the max-values
 CLAMP_LB = 1e-6
 
 
-class SelfCorrectingBayesianOptimization(
+class qSelfCorrectingBayesianOptimization(
     FullyBayesianAcquisitionFunction, MCSamplerMixin
 ):
     def __init__(
@@ -126,6 +126,7 @@ class SelfCorrectingBayesianOptimization(
         self.distance = DISTANCE_METRICS[distance_metric]
         self.set_X_pending(X_pending)
 
+    @concatenate_pending_points
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
         # since we have two MC dims (over models and optima), we need to
@@ -136,8 +137,10 @@ class SelfCorrectingBayesianOptimization(
         cond_means = posterior.mean
         marg_mean = cond_means.mean(dim=MCMC_DIM, keepdim=True)
         cond_variances = posterior.variance
+        cond_covar = posterior.covariance_matrix
         # the mixture variance is squeezed, need it unsqueezed
-        marg_variance = posterior.mixture_variance.unsqueeze(MCMC_DIM)
+        marg_covar = posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)
+        marg_var = posterior.mixture_variance.unsqueeze(MCMC_DIM)
         noiseless_var = self.conditional_model.posterior(
             X.unsqueeze(MCMC_DIM), observation_noise=False
         ).variance
@@ -154,12 +157,23 @@ class SelfCorrectingBayesianOptimization(
         mean_truncated = cond_means - noiseless_var.sqrt() * pdf_mvs / cdf_mvs
 
         # This is the noiseless variance (i.e. the part that gets truncated)
-        var_truncated = cond_variances * (
+        var_truncated = noiseless_var * (
             1 - normalized_mvs * pdf_mvs / cdf_mvs - torch.pow(pdf_mvs / cdf_mvs, 2)
         )
-        var_truncated = var_truncated + (cond_variances - cond_variances)
-
-        dist = self.distance(mean_truncated, marg_mean, var_truncated, marg_variance)
+        # and add the (possibly heteroskedastic) noise
+        var_truncated = var_truncated + (cond_variances - noiseless_var)
+        # truncating the entire covariance matrix is not trivial, so we assume the 
+        # truncation is proportional on the off-diags as on the diagonals and scale
+        # the covariance accordingly for all elements in the q-batch (if there is one)
+        # for q=1, this is equivalent to simply truncating the posterior
+        covar_scaling = (var_truncated / cond_variances).sqrt()
+        trunc_covar = covar_scaling.transpose(-1, -2) * covar_scaling * cond_covar
+        dist = self.distance(mean_truncated, marg_mean, trunc_covar, marg_covar)
         # squeeze output dim and average over optimal samples dim (MCMC_DIM).
         # Model dim is averaged later
-        return dist.squeeze(-1).mean(MCMC_DIM).mean(-1)
+        from botorch.utils.metrics import hellinger_distance_single
+        dist2 = hellinger_distance_single(mean_truncated, marg_mean, var_truncated, marg_var).squeeze(-1)
+        breakpoint()
+
+        res = dist.mean(MCMC_DIM).sum(-1)
+        return res
