@@ -95,14 +95,18 @@ class BayesianQueryByComittee(FullyBayesianAcquisitionFunction):
         super().__init__(model)
         self.set_X_pending(X_pending)
 
+
     @concatenate_pending_points
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
-        posterior = self.model.posterior(X, observation_noise=True)
+        posterior = self.model.posterior(X)
         posterior_mean = posterior.mean
-        marg_mean = posterior_mean.mean(dim=MCMC_DIM, keepdim=True)
-        var_of_mean = torch.pow(marg_mean - posterior_mean, 2)
-        return var_of_mean.squeeze(-1).squeeze(-1)
+        marg_mean = posterior.mixture_mean.unsqueeze(MCMC_DIM)
+        mean_diff = posterior_mean - marg_mean
+        covar_of_mean = torch.matmul(mean_diff, mean_diff.transpose(-1, -2))
+        
+        res = torch.logdet(covar_of_mean).exp()
+        return torch.nan_to_num(res, 0)
 
 
 class qBayesianActiveLearningByDisagreement(
