@@ -21,6 +21,7 @@ from botorch.utils.stat_distance import (
     hellinger_distance,
     kl_divergence,
     wasserstein_distance,
+    hellinger_distance_single,
 )
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
@@ -58,7 +59,7 @@ class FullyBayesianAcquisitionFunction(AcquisitionFunction):
             )
 
 
-class BayesianVarianceReduction(FullyBayesianAcquisitionFunction):
+class qBayesianVarianceReduction(FullyBayesianAcquisitionFunction):
     def __init__(
         self,
         model: SaasFullyBayesianSingleTaskGP,
@@ -77,10 +78,15 @@ class BayesianVarianceReduction(FullyBayesianAcquisitionFunction):
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
         posterior = self.model.posterior(X, observation_noise=True)
-        return posterior.mixture_variance.squeeze(-1)
+        res = torch.logdet(posterior.mixture_covariance_matrix).exp()
+        
+        # the MCMC dim is averaged out in the mixture postrior,
+        # so the result needs to be unsqueeze[d for the averaging
+        # in the decorator
+        return res.unsqueeze(-1)
 
 
-class BayesianQueryByComittee(FullyBayesianAcquisitionFunction):
+class qBayesianQueryByComittee(FullyBayesianAcquisitionFunction):
     def __init__(
         self,
         model: SaasFullyBayesianSingleTaskGP,
@@ -168,7 +174,7 @@ class qBayesianActiveLearningByDisagreement(
         return prev_entropy - post_ub_entropy
 
 
-class StatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
+class qStatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
     def __init__(
         self,
         model: SaasFullyBayesianSingleTaskGP,
@@ -211,11 +217,13 @@ class StatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
     def forward(self, X: Tensor) -> Tensor:
         posterior = self.model.posterior(X, observation_noise=True)
         cond_means = posterior.mean
-        marg_mean = cond_means.mean(dim=MCMC_DIM, keepdim=True)
-        cond_variances = posterior.variance
+        marg_mean = posterior.mixture_mean.unsqueeze(MCMC_DIM)
+        cond_covar = posterior.covariance_matrix
 
         # the mixture variance is squeezed, need it unsqueezed
-        marg_variance = posterior.mixture_variance.unsqueeze(MCMC_DIM)
-        dist = self.distance(cond_means, marg_mean, cond_variances, marg_variance)
-        # squeeze output dim and average over batch dim - MCMC dim is averaged laterc
-        return dist.squeeze(-1).mean(-1)
+        marg_covar = posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)
+        dist = self.distance(cond_means, marg_mean, cond_covar, marg_covar)
+        
+        # squeeze output dim - batch dim computed and reduced inside of dist
+        # MCMC dim is averaged in decorator
+        return dist.squeeze(-1)
