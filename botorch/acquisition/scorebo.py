@@ -162,6 +162,7 @@ class qSelfCorrectingBayesianOptimization(
         )
         # and add the (possibly heteroskedastic) noise
         var_truncated = var_truncated + (cond_variances - noiseless_var)
+        
         # truncating the entire covariance matrix is not trivial, so we assume the 
         # truncation is proportional on the off-diags as on the diagonals and scale
         # the covariance accordingly for all elements in the q-batch (if there is one)
@@ -169,11 +170,7 @@ class qSelfCorrectingBayesianOptimization(
         covar_scaling = (var_truncated / cond_variances).sqrt()
         trunc_covar = covar_scaling.transpose(-1, -2) * covar_scaling * cond_covar
         dist = self.distance(mean_truncated, marg_mean, trunc_covar, marg_covar)
+
         # squeeze output dim and average over optimal samples dim (MCMC_DIM).
         # Model dim is averaged later
-        from botorch.utils.metrics import hellinger_distance_single
-        dist2 = hellinger_distance_single(mean_truncated, marg_mean, var_truncated, marg_var).squeeze(-1)
-        breakpoint()
-
-        res = dist.mean(MCMC_DIM).sum(-1)
-        return res
+        return dist.mean(MCMC_DIM).sum(-1)
