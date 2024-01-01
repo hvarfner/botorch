@@ -16,14 +16,15 @@ def kl_divergence(
     Returns:
         Tensor: The kl divergence between the gaussian distributions p and q
     """
+    print('input', p_mean.shape, p_covar.shape)
     p_inv_covar = torch.inverse(p_covar)
     mean_diff = p_mean - q_mean
     kl_first_term = torch.diagonal(torch.matmul(p_inv_covar, q_covar),
-                                dim1=2, dim2=-1).sum(-1, keepdim=True)
+                                dim1=-2, dim2=-1).sum(-1, keepdim=True)
     kl_second_term = torch.matmul(torch.matmul(mean_diff.transpose(-2, -1),
         p_inv_covar), mean_diff).squeeze(-1)
     kl_third_term = (torch.logdet(p_covar) - torch.logdet(q_covar)).unsqueeze(-1)
-    return 0.5 * (kl_first_term + kl_second_term + kl_third_term - + p_mean.shape[-2]) 
+    return 0.5 * (kl_first_term + kl_second_term + kl_third_term - p_mean.shape[-2]) 
 
 
 def hellinger_distance(
