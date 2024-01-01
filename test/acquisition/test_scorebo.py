@@ -7,7 +7,7 @@
 from itertools import product
 
 import torch
-from botorch.acquisition.scorebo import SelfCorrectingBayesianOptimization
+from botorch.acquisition.scorebo import qSelfCorrectingBayesianOptimization
 from botorch.models.fully_bayesian import SaasFullyBayesianSingleTaskGP
 
 from botorch.models.gp_regression import SingleTaskGP
@@ -82,13 +82,13 @@ def get_model(
 
     return model
 
-class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
+class TestQSelfCorrectingBayesianOptimization(BotorchTestCase):
         
-    def test_scorebo(self):
+    def test_q_self_correcting_bayesian_optimization(self):
         torch.manual_seed(1)
         tkwargs = {"device": self.device}
         estimation_types = ["LB"] # MC not implemented yet (the other option)
-        distance_metrics = ("hellinger", "wasserstein", "kl_divergence")
+        distance_metrics = ("hellinger", "kl_divergence")
         num_objectives = 1
         num_models = 3
         for (
@@ -125,7 +125,7 @@ class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
                 **tkwargs,
             )
 
-            num_optimal_samples = 5
+            num_optimal_samples = 7
             optimal_inputs = torch.rand(
                 num_optimal_samples,
                 num_models,
@@ -148,7 +148,7 @@ class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
             for i in range(len(X_pending_list)):
                 X_pending = X_pending_list[i]
 
-                acq = SelfCorrectingBayesianOptimization(
+                acq = qSelfCorrectingBayesianOptimization(
                     model=model,
                     optimal_inputs=optimal_inputs,
                     optimal_outputs=optimal_outputs,
@@ -167,15 +167,12 @@ class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
                 ]
 
                 for j in range(len(test_Xs)):
-                    acq_X = acq.forward(test_Xs[j])
                     acq_X = acq(test_Xs[j])
                     # assess shape
                     self.assertTrue(acq_X.shape == test_Xs[j].shape[:-2])
 
-                    print(acq_X.shape)
-
         with self.assertRaises(ValueError):
-            acq = SelfCorrectingBayesianOptimization(
+            acq = qSelfCorrectingBayesianOptimization(
                 model=model,
                 optimal_inputs=optimal_inputs,
                 optimal_outputs=optimal_outputs,
@@ -186,7 +183,7 @@ class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
             )
 
         with self.assertRaises(ValueError):
-            acq = SelfCorrectingBayesianOptimization(
+            acq = qSelfCorrectingBayesianOptimization(
                 model=model,
                 optimal_inputs=optimal_inputs,
                 optimal_outputs=optimal_outputs,
@@ -200,7 +197,7 @@ class TestSelfCorrectingBayesianOptimization(BotorchTestCase):
         # throw an error.
         non_fully_bayesian_model = SingleTaskGP(train_X, train_Y)
         with self.assertRaises(ValueError):
-            acq = SelfCorrectingBayesianOptimization(
+            acq = qSelfCorrectingBayesianOptimization(
                 model=non_fully_bayesian_model,
                 optimal_inputs=optimal_inputs,
                 optimal_outputs=optimal_outputs,

@@ -16,7 +16,6 @@ def kl_divergence(
     Returns:
         Tensor: The kl divergence between the gaussian distributions p and q
     """
-    print('input', p_mean.shape, p_covar.shape)
     p_inv_covar = torch.inverse(p_covar)
     mean_diff = p_mean - q_mean
     kl_first_term = torch.diagonal(torch.matmul(p_inv_covar, q_covar),
