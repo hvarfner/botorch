@@ -1,20 +1,25 @@
 import torch
+from torch.distributions.kl import kl_divergence
+from torch.distributions.multivariate_normal import MultivariateNormal
 from torch import Tensor
 
 
-def kl_divergence(
+def mvn_kl_divergence(
     p_mean: Tensor, q_mean: Tensor, p_covar: Tensor, q_covar: Tensor
 ) -> Tensor:
-    """Computes
+    """Computes the kl divergence between two multivariate normal distributions.
 
     Args:
-        p_mean (Tensor): [batch_shape] x dist_shape tensor of means of first dist
-        q_mean (Tensor): [batch_shape] x dist_shape tensor of variances of first dist
-        p_var (Tensor): [batch_shape] x dist_shape tensor of means of second dist
-        q_var (Tensor): [batch_shape] x dist_shape tensor of variances of second dist
+        p_mean: batch_shape x dist_shape x 1-dim Tensor of means of first dist
+        q_mean: batch_shape x dist_shape x dist_shape-dim Tensor of covariances
+        of first dist where the covariances are (optionally) in the q-batch dim.
+        p_mean: batch_shape x dist_shape x 1-dim Tensor of means of second dist
+        q_mean: batch_shape x dist_shape x dist_shape-dim Tensor of covariances
+        of first dist where the covariances are (optionally) in the q-batch dim.
 
     Returns:
-        Tensor: The kl divergence between the gaussian distributions p and q
+        Tensor: batch_shape x dist_shape kl divergence between the multivariate 
+        gaussian distributions p and q
     """
     p_inv_covar = torch.inverse(p_covar)
     mean_diff = p_mean - q_mean
@@ -26,16 +31,19 @@ def kl_divergence(
     return 0.5 * (kl_first_term + kl_second_term + kl_third_term - p_mean.shape[-2]) 
 
 
-def hellinger_distance(
+def mvn_hellinger_distance(
     p_mean: Tensor, q_mean: Tensor, p_covar: Tensor, q_covar: Tensor
 ) -> Tensor:
-    """Computes
+    """Computes the (2)-hellinger distance between two multivariate normal
+    distributions.
 
     Args:
-        p_mean (Tensor): [batch_shape] x dist_shape tensor of means of first dist
-        q_mean (Tensor): [batch_shape] x dist_shape tensor of variances of first dist
-        p_var (Tensor): [batch_shape] x dist_shape tensor of means of second dist
-        q_var (Tensor): [batch_shape] x dist_shape tensor of variances of second dist
+        p_mean: batch_shape x dist_shape x 1-dim Tensor of means of first dist
+        q_mean: batch_shape x dist_shape x dist_shape-dim Tensor of covariances
+        of first dist where the covariances are (optionally) in the q-batch dim.
+        p_mean: batch_shape x dist_shape x 1-dim Tensor of means of second dist
+        q_mean: batch_shape x dist_shape x dist_shape-dim Tensor of covariances
+        of first dist where the covariances are (optionally) in the q-batch dim.
 
     Returns:
         Tensor: The hellinger distance between the gaussian distributions p and q
