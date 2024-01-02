@@ -39,6 +39,7 @@ import pyro
 import torch
 from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.gpytorch import BatchedMultiOutputGPyTorchModel
+from botorch.models.model import FantasizeMixin
 from botorch.models.transforms.input import InputTransform
 from botorch.models.transforms.outcome import OutcomeTransform
 from botorch.models.utils import validate_input_scaling
@@ -309,7 +310,9 @@ class SaasPyroModel(PyroModel):
         return mean_module, covar_module, likelihood
 
 
-class SaasFullyBayesianSingleTaskGP(ExactGP, BatchedMultiOutputGPyTorchModel):
+class SaasFullyBayesianSingleTaskGP(
+    ExactGP, BatchedMultiOutputGPyTorchModel, FantasizeMixin
+):
     r"""A fully Bayesian single-task GP model with the SAAS prior.
 
     This model assumes that the inputs have been normalized to [0, 1]^d and that
@@ -570,7 +573,8 @@ class SaasFullyBayesianSingleTaskGP(ExactGP, BatchedMultiOutputGPyTorchModel):
             Y = Y.repeat(self.batch_shape + (1, 1))
 
         elif X.ndim < Y.ndim:
-            # We need to duplicate the training data to enable correct batch
+            # this happens when fantasizing - one set of training data and multiple Y.
+            # In that case, we duplicate the training data to enable correct batch
             # size inference in gpytorch.
             X = X.repeat(*(Y.shape[:-2] + (1, 1)))
 
