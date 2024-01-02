@@ -41,6 +41,12 @@ from botorch.acquisition.analytic import (
     ProbabilityOfImprovement,
     UpperConfidenceBound,
 )
+from botorch.acquisition.bayesian_active_learning import (
+    qBayesianActiveLearningByDisagreement,
+    qBayesianQueryByComittee,
+    qBayesianVarianceReduction,
+    qStatisticalDistanceActiveLearning,
+)
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
 from botorch.acquisition.joint_entropy_search import qJointEntropySearch
@@ -88,6 +94,7 @@ from botorch.acquisition.objective import (
 )
 from botorch.acquisition.preference import AnalyticExpectedUtilityOfBestOption
 from botorch.acquisition.risk_measures import RiskMeasureMCObjective
+from botorch.acquisition.scorebo import qSelfCorrectingBayesianOptimization
 from botorch.acquisition.utils import (
     compute_best_feasible_objective,
     expand_trace_observations,
@@ -1546,5 +1553,89 @@ def construct_inputs_qJES(
         "X_pending": X_pending,
         "estimation_type": estimation_type,
         "num_samples": num_samples,
+    }
+    return inputs
+
+
+@acqf_input_constructor(
+    qBayesianQueryByComittee,
+    qBayesianVarianceReduction,
+)
+def construct_inputs_BAL(
+    model: Model,
+    X_pending: Optional[Tensor] = None,
+):
+    inputs = {
+        "model": model,
+        "X_pending": X_pending,
+    }
+    return inputs
+
+
+@acqf_input_constructor(qBayesianActiveLearningByDisagreement)
+def construct_inputs_BALD(
+    model: Model,
+    X_pending: Optional[Tensor] = None,
+    estimation_type: Optional[str] = "LB",
+    num_samples: Optional[int] = 64,
+):
+    inputs = {
+        "model": model,
+        "X_pending": X_pending,
+        "estimation_type": estimation_type,
+        "num_samples": num_samples,
+    }
+    return inputs
+
+
+@acqf_input_constructor(qStatisticalDistanceActiveLearning)
+def construct_inputs_SAL(
+    model: Model,
+    distance_metric: str = "hellinger",
+    X_pending: Optional[Tensor] = None,
+    estimation_type: str = "LB",
+    num_samples: int = 64,
+):
+    inputs = {
+        "model": model,
+        "distance_metric": distance_metric,
+        "X_pending": X_pending,
+        "estimation_type": estimation_type,
+        "num_samples": num_samples,
+    }
+    return inputs
+
+
+@acqf_input_constructor(qSelfCorrectingBayesianOptimization)
+def construct_inputs_SCoreBO(
+    model: Model,
+    bounds: List[Tuple[float, float]],
+    num_optima: int = 8,
+    maximize: bool = True,
+    distance_metric: str = "hellinger",
+    X_pending: Optional[Tensor] = None,
+    estimation_type: str = "LB",
+    num_samples: int = 64,
+    posterior_transform: Optional[PosteriorTransform] = None,
+):
+    dtype = model.train_targets.dtype
+    # the number of optima are per model
+    optimal_inputs, optimal_outputs = get_optimal_samples(
+        model=model,
+        bounds=torch.as_tensor(bounds, dtype=dtype).T,
+        num_optima=num_optima,
+        maximize=maximize,
+    )
+
+    inputs = {
+        "model": model,
+        "optimal_inputs": optimal_inputs,
+        "optimal_outputs": optimal_outputs,
+        "distance_metric": distance_metric,
+        "maximize": maximize,
+        "X_pending": X_pending,
+        "estimation_type": estimation_type,
+        "num_samples": num_samples,
+        "posterior_transform": posterior_transform,
     }
     return inputs
