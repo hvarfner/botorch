@@ -23,6 +23,13 @@ from botorch.acquisition.analytic import (
     ProbabilityOfImprovement,
     UpperConfidenceBound,
 )
+from botorch.acquisition.bayesian_active_learning import (
+    FullyBayesianAcquisitionFunction,
+    qBayesianActiveLearningByDisagreement,
+    qBayesianQueryByComittee,
+    qBayesianVarianceReduction,
+    qStatisticalDistanceActiveLearning,
+)
 from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
 from botorch.acquisition.input_constructors import (
     _field_is_shared,
@@ -79,12 +86,13 @@ from botorch.acquisition.objective import (
     ScalarizedPosteriorTransform,
 )
 from botorch.acquisition.preference import AnalyticExpectedUtilityOfBestOption
+from botorch.acquisition.scorebo import qSelfCorrectingBayesianOptimization
 from botorch.acquisition.utils import (
     expand_trace_observations,
     project_to_target_fidelity,
 )
 from botorch.exceptions.errors import UnsupportedError
-from botorch.models import MultiTaskGP, SingleTaskGP
+from botorch.models import MultiTaskGP, SingleTaskGP, SaasFullyBayesianSingleTaskGP
 from botorch.models.deterministic import FixedSingleSampleModel
 from botorch.models.model_list_gp_regression import ModelListGP
 from botorch.sampling.normal import IIDNormalSampler, SobolQMCNormalSampler
@@ -1284,6 +1292,151 @@ class TestMultiObjectiveAcquisitionFunctionInputConstructors(
         self.assertEqual(len(kwargs["optimal_outputs"].shape), 2)
         qJointEntropySearch(**kwargs)
 
+    def test_construct_inputs_scorebo(self) -> None:
+        func = get_acqf_input_constructor(qSelfCorrectingBayesianOptimization)
+        num_samples, num_optima = 3, 7
+        model = SaasFullyBayesianSingleTaskGP(
+            self.blockX_blockY[0].X, self.blockX_blockY[0].Y)
+
+        model.load_mcmc_samples(
+            {
+                "lengthscale": torch.rand(
+                    num_samples, 1, self.blockX_blockY[0].X.shape[-1], 
+                    dtype=torch.double
+                ),
+                "outputscale": torch.rand(num_samples, dtype=torch.double),
+                "mean": torch.randn(num_samples, dtype=torch.double),
+                "noise": torch.rand(num_samples, 1, dtype=torch.double)
+            }
+        )
+
+        kwargs = func(
+            model=model,
+            training_data=self.blockX_blockY,
+            bounds=self.bounds,
+            num_optima=num_optima,
+            maximize=False,
+            distance_metric="kl_divergence",
+        )
+        self.assertFalse(kwargs["maximize"])
+        self.assertEqual(self.blockX_blockY[0].X.dtype, kwargs["optimal_inputs"].dtype)
+        self.assertEqual(len(kwargs["optimal_inputs"]), num_optima)
+        self.assertEqual(len(kwargs["optimal_outputs"]), num_optima)
+        # asserting that, for the non-batch case, the optimal inputs are
+        # of shape num_models x N x D and outputs are num_models x N x 1
+        self.assertEqual(len(kwargs["optimal_inputs"].shape), 3)
+        self.assertEqual(len(kwargs["optimal_outputs"].shape), 3)
+        self.assertEqual(kwargs["distance_metric"], "kl_divergence")
+        qSelfCorrectingBayesianOptimization(**kwargs)
+
+
+    def test_construct_inputs_sal(self) -> None:
+            func = get_acqf_input_constructor(qStatisticalDistanceActiveLearning)
+            num_samples = 3
+            model = SaasFullyBayesianSingleTaskGP(
+                self.blockX_blockY[0].X, self.blockX_blockY[0].Y)
+
+            model.load_mcmc_samples(
+                {
+                    "lengthscale": torch.rand(
+                        num_samples, 1, self.blockX_blockY[0].X.shape[-1], 
+                        dtype=torch.double
+                    ),
+                    "outputscale": torch.rand(num_samples, dtype=torch.double),
+                    "mean": torch.randn(num_samples, dtype=torch.double),
+                    "noise": torch.rand(num_samples, 1, dtype=torch.double)
+                }
+            )
+
+            kwargs = func(
+                model=model,
+                training_data=self.blockX_blockY,
+                bounds=self.bounds,
+                distance_metric="kl_divergence",
+            )
+            
+            self.assertEqual(kwargs["distance_metric"], "kl_divergence")
+            qStatisticalDistanceActiveLearning(**kwargs)
+
+    def test_construct_inputs_bald(self) -> None:
+            func = get_acqf_input_constructor(qBayesianActiveLearningByDisagreement)
+            num_samples = 3
+            model = SaasFullyBayesianSingleTaskGP(
+                self.blockX_blockY[0].X, self.blockX_blockY[0].Y)
+
+            model.load_mcmc_samples(
+                {
+                    "lengthscale": torch.rand(
+                        num_samples, 1, self.blockX_blockY[0].X.shape[-1], 
+                        dtype=torch.double
+                    ),
+                    "outputscale": torch.rand(num_samples, dtype=torch.double),
+                    "mean": torch.randn(num_samples, dtype=torch.double),
+                    "noise": torch.rand(num_samples, 1, dtype=torch.double)
+                }
+            )
+
+            kwargs = func(
+                model=model,
+                training_data=self.blockX_blockY,
+                bounds=self.bounds,
+                estimation_type="LB",
+            )
+            
+            self.assertEqual(kwargs["estimation_type"], "LB")
+            qBayesianActiveLearningByDisagreement(**kwargs)
+
+    def test_construct_inputs_bqbc(self) -> None:
+            func = get_acqf_input_constructor(qBayesianQueryByComittee)
+            num_samples = 3
+            model = SaasFullyBayesianSingleTaskGP(
+                self.blockX_blockY[0].X, self.blockX_blockY[0].Y)
+
+            model.load_mcmc_samples(
+                {
+                    "lengthscale": torch.rand(
+                        num_samples, 1, self.blockX_blockY[0].X.shape[-1], 
+                        dtype=torch.double
+                    ),
+                    "outputscale": torch.rand(num_samples, dtype=torch.double),
+                    "mean": torch.randn(num_samples, dtype=torch.double),
+                    "noise": torch.rand(num_samples, 1, dtype=torch.double)
+                }
+            )
+
+            kwargs = func(
+                model=model,
+                training_data=self.blockX_blockY,
+                bounds=self.bounds,
+            )
+            
+            qBayesianQueryByComittee(**kwargs)
+
+    def test_construct_inputs_bayesian_variance_reduction(self) -> None:
+            func = get_acqf_input_constructor(qBayesianVarianceReduction)
+            num_samples = 3
+            model = SaasFullyBayesianSingleTaskGP(
+                self.blockX_blockY[0].X, self.blockX_blockY[0].Y)
+
+            model.load_mcmc_samples(
+                {
+                    "lengthscale": torch.rand(
+                        num_samples, 1, self.blockX_blockY[0].X.shape[-1], 
+                        dtype=torch.double
+                    ),
+                    "outputscale": torch.rand(num_samples, dtype=torch.double),
+                    "mean": torch.randn(num_samples, dtype=torch.double),
+                    "noise": torch.rand(num_samples, 1, dtype=torch.double)
+                }
+            )
+
+            kwargs = func(
+                model=model,
+                training_data=self.blockX_blockY,
+                bounds=self.bounds,
+            )
+            
+            qBayesianVarianceReduction(**kwargs)
 
 class TestInstantiationFromInputConstructor(InputConstructorBaseTestCase):
     def _test_constructor_base(

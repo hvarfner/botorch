@@ -24,6 +24,11 @@ from botorch.acquisition.multi_objective.hypervolume_knowledge_gradient import (
     qHypervolumeKnowledgeGradient,
     qMultiFidelityHypervolumeKnowledgeGradient,
 )
+from botorch.acquisition.joint_entropy_search import qJointEntropySearch
+
+from botorch.acquisition.multi_objective.joint_entropy_search import (
+    qLowerBoundMultiObjectiveJointEntropySearch
+)
 from botorch.acquisition.multi_objective.monte_carlo import (
     qNoisyExpectedHypervolumeImprovement,
 )
@@ -37,6 +42,7 @@ from botorch.optim.initializers import (
     gen_batch_initial_conditions,
     gen_one_shot_hvkg_initial_conditions,
     gen_one_shot_kg_initial_conditions,
+    gen_optimal_location_initial_conditions,
     gen_value_function_initial_conditions,
     sample_perturbed_subset_dims,
     sample_points_around_best,
@@ -1430,3 +1436,62 @@ class TestSampleAroundBest(BotorchTestCase):
             self.assertTrue(
                 ((X_rnd.unsqueeze(0) == X_train.unsqueeze(1)).all(dim=-1)).sum() == 0
             )
+
+
+class TestGenOptimalLocationInitialConditions(BotorchTestCase):
+    def test_optimal_location_initial_conditions(self):
+        num_optima = 4
+        raw_samples = 64
+        num_restarts = 4
+        for dtype in (torch.float, torch.double):
+            mean = torch.zeros(1, 1, device=self.device, dtype=dtype)
+            mm = MockModel(MockPosterior(mean=mean))
+            acq_kwargs = {
+                "optimal_inputs": torch.rand(num_optima, 2),
+                "optimal_outputs": torch.rand(num_optima, 1),
+            }
+            mock_acq = qJointEntropySearch(model=mm, **acq_kwargs)
+            
+            
+            mean = torch.zeros(1, 2, device=self.device, dtype=dtype)
+            mo_mm = MockModel(MockPosterior(mean=mean))
+            mo_acq_kwargs = {
+                "pareto_sets": torch.rand(num_optima, 2),
+                "pareto_fronts": torch.rand(num_optima, 2),
+            }
+            
+            mock_mo_acq = qLowerBoundMultiObjectiveJointEntropySearch(
+                model=mo_mm, 
+                **acq_kwargs
+            )
+            bounds = torch.tensor([[0, 0], [1, 1]], device=self.device, dtype=dtype)
+            # test option error
+            with self.assertRaises(ValueError):
+                gen_optimal_location_initial_conditions(
+                    acq_function=mock_acq,
+                    bounds=bounds,
+                    q=1,
+                    num_restarts=num_restarts,
+                    raw_samples=raw_samples,
+                    options={"frac_random": 2.0},
+                )
+
+            ics = gen_optimal_location_initial_conditions(
+                acq_function=mock_acq,
+                bounds=bounds,
+                q=3,
+                num_restarts=num_restarts,
+                raw_samples=raw_samples,
+                options={"frac_random": 0.5},
+            )
+
+            mo_ics = gen_optimal_location_initial_conditions(
+                acq_function=mock_mo_acq,
+                bounds=bounds,
+                q=1,
+                num_restarts=num_restarts,
+                raw_samples=raw_samples,
+                options={"frac_random": 0.5},
+            )
+
+

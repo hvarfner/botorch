@@ -1558,22 +1558,33 @@ def construct_inputs_qJES(
 
 
 @acqf_input_constructor(
-    qBayesianActiveLearningByDisagreement,
     qBayesianQueryByComittee,
     qBayesianVarianceReduction,
 )
 def construct_inputs_BAL(
     model: Model,
     X_pending: Optional[Tensor] = None,
-    posterior_transform: Optional[PosteriorTransform] = None,
 ):
     inputs = {
         "model": model,
         "X_pending": X_pending,
-        "posterior_transform": posterior_transform,
     }
     return inputs
 
+@acqf_input_constructor(qBayesianActiveLearningByDisagreement)
+def construct_inputs_BALD(
+    model: Model,
+    X_pending: Optional[Tensor] = None,
+    estimation_type: Optional[str] = "LB",
+    num_samples: Optional[int] = 64,
+):
+    inputs = {
+        "model": model,
+        "X_pending": X_pending,
+        "estimation_type": estimation_type,
+        "num_samples": num_samples,
+    }
+    return inputs
 
 @acqf_input_constructor(qStatisticalDistanceActiveLearning)
 def construct_inputs_SAL(
@@ -1582,7 +1593,6 @@ def construct_inputs_SAL(
     X_pending: Optional[Tensor] = None,
     estimation_type: str = "LB",
     num_samples: int = 64,
-    posterior_transform: Optional[PosteriorTransform] = None,
 ):
     inputs = {
         "model": model,
@@ -1590,7 +1600,6 @@ def construct_inputs_SAL(
         "X_pending": X_pending,
         "estimation_type": estimation_type,
         "num_samples": num_samples,
-        "posterior_transform": posterior_transform,
     }
     return inputs
 

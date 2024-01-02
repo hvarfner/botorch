@@ -17,9 +17,9 @@ from botorch.models.model import Model
 from botorch.sampling.base import MCSampler
 from botorch.sampling.normal import SobolQMCNormalSampler
 
-from botorch.utils.metrics import (
-    hellinger_distance,
-    kl_divergence,
+from botorch.utils.stat_dist import (
+    mvn_hellinger_distance,
+    mvn_kl_divergence,
 )
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
@@ -27,8 +27,8 @@ from torch import Tensor
 
 SAMPLE_DIM = -4
 DISTANCE_METRICS = {
-    "hellinger": hellinger_distance,
-    "kl_divergence": kl_divergence,
+    "hellinger": mvn_hellinger_distance,
+    "kl_divergence": mvn_kl_divergence,
 }
 
 
@@ -36,23 +36,14 @@ class FullyBayesianAcquisitionFunction(AcquisitionFunction):
     def __init__(self, model: Model):
         """Base class for acquisition functions which require a Fully Bayesian
             model treatment.
-
-        Args:
-            AcquisitionFunction (_type_): _description_
-
-        Returns:
-            _type_: _description_
-
-        Returns:
-            _type_: _description_
         """
-        if isinstance(model, SaasFullyBayesianSingleTaskGP):
+        if model._is_fully_bayesian:
             super().__init__(model)
 
         else:
             raise ValueError(
                 "Fully Bayesian acquiition functions require "
-                "a SaasFullyBayesianSingleTaskGP to run."
+                "a fully bayesian model (SaasFullyBayesianSingleTaskGP) to run."
             )
 
 
@@ -65,10 +56,9 @@ class qBayesianVarianceReduction(FullyBayesianAcquisitionFunction):
         """_summary_
 
         Args:
-            model (Model): A SAASFullyBayesianSingleTaskGP.
+            model (Model): A SaasFullyBayesianSingleTaskGP.
         """
         super().__init__(model)
-
         self.set_X_pending(X_pending)
 
     @concatenate_pending_points
@@ -88,7 +78,6 @@ class qBayesianQueryByComittee(FullyBayesianAcquisitionFunction):
         self,
         model: SaasFullyBayesianSingleTaskGP,
         X_pending: Optional[Tensor] = None,
-        posterior_transform: Optional[PosteriorTransform] = None,
     ) -> None:
         """
 
@@ -119,7 +108,6 @@ class qBayesianActiveLearningByDisagreement(
         self,
         model: SaasFullyBayesianSingleTaskGP,
         X_pending: Optional[Tensor] = None,
-        posterior_transform: Optional[PosteriorTransform] = None,
         estimation_type: str = "LB",
         sampler: Optional[MCSampler] = None,
         num_samples: int = 64,
@@ -138,7 +126,6 @@ class qBayesianActiveLearningByDisagreement(
             ValueError: _description_
         """
         super().__init__(model)
-        self.posterior_transform = posterior_transform
         if estimation_type not in ["LB"]:
             raise ValueError(f"Estimation type {estimation_type} does not exist.")
         self.set_X_pending(X_pending)
@@ -159,8 +146,7 @@ class qBayesianActiveLearningByDisagreement(
         return self.acq_method(X)
 
     def _compute_lower_bound_information_gain(self, X: Tensor) -> Tensor:
-        posterior = self.model.posterior(X, observation_noise=True, 
-                                         posterior_transform=self.posterior_transform)
+        posterior = self.model.posterior(X, observation_noise=True)
         marg_covar = posterior.mixture_covariance_matrix
         cond_variances = posterior.variance
         
@@ -176,7 +162,6 @@ class qStatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
         self,
         model: SaasFullyBayesianSingleTaskGP,
         X_pending: Optional[Tensor] = None,
-        posterior_transform: Optional[PosteriorTransform] = None,
         distance_metric: str = "hellinger",
         estimation_type: str = "LB",
         sampler: Optional[MCSampler] = None,
