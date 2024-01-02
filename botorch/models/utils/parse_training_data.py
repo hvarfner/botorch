@@ -14,6 +14,7 @@ from typing import Any, Dict, Type
 import torch
 from botorch.models.model import Model
 from botorch.models.pairwise_gp import PairwiseGP
+from botorch.models.fully_bayesian import SaasFullyBayesianSingleTaskGP
 from botorch.utils.datasets import RankingDataset, SupervisedDataset
 from botorch.utils.dispatcher import Dispatcher
 from torch import Tensor
@@ -52,6 +53,17 @@ def _parse_model_supervised(
     if dataset.Yvar is not None:
         parsed_data["train_Yvar"] = dataset.Yvar
     return parsed_data
+
+
+@dispatcher.register(SaasFullyBayesianSingleTaskGP, SupervisedDataset)
+def _parse_model_fullybayesian(
+    consumer: Model, dataset: SupervisedDataset, **kwargs: Any
+) -> Dict[str, Tensor]:
+    parsed_data = {"train_X": dataset.X, "train_Y": dataset.Y}
+    if dataset.Yvar is not None:
+        parsed_data["train_Yvar"] = dataset.Yvar
+
+    return {**parsed_data, "pyro_model": kwargs.get("pyro_model")}
 
 
 @dispatcher.register(PairwiseGP, RankingDataset)

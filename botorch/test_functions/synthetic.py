@@ -802,6 +802,73 @@ class ThreeHumpCamel(SyntheticTestFunction):
         return 2.0 * x1**2 - 1.05 * x1**4 + x1**6 / 6.0 + x1 * x2 + x2**2
 
 
+class Gramacy1(SyntheticTestFunction):
+
+    def __init__(
+        self,
+        noise_std: float = 0,
+        negate: bool = True
+    ) -> None:
+        self.dim = 1
+        self._bounds = [(0.5, 2.5)]
+        super().__init__(noise_std=noise_std, negate=negate, bounds=self._bounds)
+
+    def evaluate_true(self, X: Tensor) -> Tensor:
+        return (torch.sin(10 * math.pi * X) / (2 * X) + torch.pow(X - 1, 4)).flatten()
+
+
+class Gramacy2(SyntheticTestFunction):
+
+    def __init__(
+        self,
+        noise_std: float = 0,
+        negate: bool = True
+    ) -> None:
+        self.dim = 2
+        self._bounds = [(-2.0, 6.0), (-2.0, 6.0)]
+        super().__init__(noise_std=noise_std, negate=negate, bounds=self._bounds)
+
+    def evaluate_true(self, X: Tensor) -> Tensor:
+        return (X[:, 0] * torch.exp(-torch.pow(X[:, 0], 2) - torch.pow(X[:, 1], 2))).flatten()
+
+
+class Higdon(SyntheticTestFunction):
+
+    def __init__(
+        self,
+        noise_std: float = 0,
+        negate: bool = True
+    ) -> None:
+        self.dim = 1
+        self._bounds = [(0.0, 20.0)]
+        super().__init__(noise_std=noise_std, negate=negate, bounds=self._bounds)
+
+    def evaluate_true(self, X: Tensor) -> Tensor:
+        x = X.detach().numpy()
+        output = np.piecewise(x,
+                              [x < 10, x >= 10],
+                              [lambda xx: np.sin(np.pi * xx / 5) + 0.2 * np.cos(4 * np.pi * xx / 5),
+                                  lambda xx: xx / 10 - 1])
+        return Tensor(output).to(X.device).flatten()
+
+
+class Ishigami(SyntheticTestFunction):
+    def __init__(
+        self,
+        noise_std: float = 0,
+        negate: bool = True
+    ) -> None:
+        self.dim = 3
+        self._bounds = [(-3.141527, 3.141527)] * self.dim
+        super().__init__(noise_std=noise_std, negate=negate, bounds=self._bounds)
+
+    def evaluate_true(self, X: Tensor) -> Tensor:
+        a = 7
+        b = 0.1
+        return (torch.sin(X[:, 0]) + a * torch.pow(torch.sin(X[:, 1]), 2)
+                + b * torch.pow(X[:, 2], 4) * torch.sin(X[:, 0])).flatten()
+    
+
 #  ------------ Constrained synthetic test functions ----------- #
 
 
