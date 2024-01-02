@@ -24,7 +24,6 @@ from botorch.acquisition.analytic import (
     UpperConfidenceBound,
 )
 from botorch.acquisition.bayesian_active_learning import (
-    FullyBayesianAcquisitionFunction,
     qBayesianActiveLearningByDisagreement,
     qBayesianQueryByComittee,
     qBayesianVarianceReduction,
@@ -92,7 +91,7 @@ from botorch.acquisition.utils import (
     project_to_target_fidelity,
 )
 from botorch.exceptions.errors import UnsupportedError
-from botorch.models import MultiTaskGP, SingleTaskGP, SaasFullyBayesianSingleTaskGP
+from botorch.models import MultiTaskGP, SaasFullyBayesianSingleTaskGP, SingleTaskGP
 from botorch.models.deterministic import FixedSingleSampleModel
 from botorch.models.model_list_gp_regression import ModelListGP
 from botorch.sampling.normal import IIDNormalSampler, SobolQMCNormalSampler
@@ -1296,17 +1295,20 @@ class TestMultiObjectiveAcquisitionFunctionInputConstructors(
         func = get_acqf_input_constructor(qSelfCorrectingBayesianOptimization)
         num_samples, num_optima = 3, 7
         model = SaasFullyBayesianSingleTaskGP(
-            self.blockX_blockY[0].X, self.blockX_blockY[0].Y)
+            self.blockX_blockY[0].X, self.blockX_blockY[0].Y
+        )
 
         model.load_mcmc_samples(
             {
                 "lengthscale": torch.rand(
-                    num_samples, 1, self.blockX_blockY[0].X.shape[-1], 
-                    dtype=torch.double
+                    num_samples,
+                    1,
+                    self.blockX_blockY[0].X.shape[-1],
+                    dtype=torch.double,
                 ),
                 "outputscale": torch.rand(num_samples, dtype=torch.double),
                 "mean": torch.randn(num_samples, dtype=torch.double),
-                "noise": torch.rand(num_samples, 1, dtype=torch.double)
+                "noise": torch.rand(num_samples, 1, dtype=torch.double),
             }
         )
 
@@ -1329,114 +1331,126 @@ class TestMultiObjectiveAcquisitionFunctionInputConstructors(
         self.assertEqual(kwargs["distance_metric"], "kl_divergence")
         qSelfCorrectingBayesianOptimization(**kwargs)
 
-
     def test_construct_inputs_sal(self) -> None:
-            func = get_acqf_input_constructor(qStatisticalDistanceActiveLearning)
-            num_samples = 3
-            model = SaasFullyBayesianSingleTaskGP(
-                self.blockX_blockY[0].X, self.blockX_blockY[0].Y)
+        func = get_acqf_input_constructor(qStatisticalDistanceActiveLearning)
+        num_samples = 3
+        model = SaasFullyBayesianSingleTaskGP(
+            self.blockX_blockY[0].X, self.blockX_blockY[0].Y
+        )
 
-            model.load_mcmc_samples(
-                {
-                    "lengthscale": torch.rand(
-                        num_samples, 1, self.blockX_blockY[0].X.shape[-1], 
-                        dtype=torch.double
-                    ),
-                    "outputscale": torch.rand(num_samples, dtype=torch.double),
-                    "mean": torch.randn(num_samples, dtype=torch.double),
-                    "noise": torch.rand(num_samples, 1, dtype=torch.double)
-                }
-            )
+        model.load_mcmc_samples(
+            {
+                "lengthscale": torch.rand(
+                    num_samples,
+                    1,
+                    self.blockX_blockY[0].X.shape[-1],
+                    dtype=torch.double,
+                ),
+                "outputscale": torch.rand(num_samples, dtype=torch.double),
+                "mean": torch.randn(num_samples, dtype=torch.double),
+                "noise": torch.rand(num_samples, 1, dtype=torch.double),
+            }
+        )
 
-            kwargs = func(
-                model=model,
-                training_data=self.blockX_blockY,
-                bounds=self.bounds,
-                distance_metric="kl_divergence",
-            )
-            
-            self.assertEqual(kwargs["distance_metric"], "kl_divergence")
-            qStatisticalDistanceActiveLearning(**kwargs)
+        kwargs = func(
+            model=model,
+            training_data=self.blockX_blockY,
+            bounds=self.bounds,
+            distance_metric="kl_divergence",
+        )
+
+        self.assertEqual(kwargs["distance_metric"], "kl_divergence")
+        qStatisticalDistanceActiveLearning(**kwargs)
 
     def test_construct_inputs_bald(self) -> None:
-            func = get_acqf_input_constructor(qBayesianActiveLearningByDisagreement)
-            num_samples = 3
-            model = SaasFullyBayesianSingleTaskGP(
-                self.blockX_blockY[0].X, self.blockX_blockY[0].Y)
+        func = get_acqf_input_constructor(qBayesianActiveLearningByDisagreement)
+        num_samples = 3
+        model = SaasFullyBayesianSingleTaskGP(
+            self.blockX_blockY[0].X, self.blockX_blockY[0].Y
+        )
 
-            model.load_mcmc_samples(
-                {
-                    "lengthscale": torch.rand(
-                        num_samples, 1, self.blockX_blockY[0].X.shape[-1], 
-                        dtype=torch.double
-                    ),
-                    "outputscale": torch.rand(num_samples, dtype=torch.double),
-                    "mean": torch.randn(num_samples, dtype=torch.double),
-                    "noise": torch.rand(num_samples, 1, dtype=torch.double)
-                }
-            )
+        model.load_mcmc_samples(
+            {
+                "lengthscale": torch.rand(
+                    num_samples,
+                    1,
+                    self.blockX_blockY[0].X.shape[-1],
+                    dtype=torch.double,
+                ),
+                "outputscale": torch.rand(num_samples, dtype=torch.double),
+                "mean": torch.randn(num_samples, dtype=torch.double),
+                "noise": torch.rand(num_samples, 1, dtype=torch.double),
+            }
+        )
 
-            kwargs = func(
-                model=model,
-                training_data=self.blockX_blockY,
-                bounds=self.bounds,
-                estimation_type="LB",
-            )
-            
-            self.assertEqual(kwargs["estimation_type"], "LB")
-            qBayesianActiveLearningByDisagreement(**kwargs)
+        kwargs = func(
+            model=model,
+            training_data=self.blockX_blockY,
+            bounds=self.bounds,
+            estimation_type="LB",
+        )
+
+        self.assertEqual(kwargs["estimation_type"], "LB")
+        qBayesianActiveLearningByDisagreement(**kwargs)
 
     def test_construct_inputs_bqbc(self) -> None:
-            func = get_acqf_input_constructor(qBayesianQueryByComittee)
-            num_samples = 3
-            model = SaasFullyBayesianSingleTaskGP(
-                self.blockX_blockY[0].X, self.blockX_blockY[0].Y)
+        func = get_acqf_input_constructor(qBayesianQueryByComittee)
+        num_samples = 3
+        model = SaasFullyBayesianSingleTaskGP(
+            self.blockX_blockY[0].X, self.blockX_blockY[0].Y
+        )
 
-            model.load_mcmc_samples(
-                {
-                    "lengthscale": torch.rand(
-                        num_samples, 1, self.blockX_blockY[0].X.shape[-1], 
-                        dtype=torch.double
-                    ),
-                    "outputscale": torch.rand(num_samples, dtype=torch.double),
-                    "mean": torch.randn(num_samples, dtype=torch.double),
-                    "noise": torch.rand(num_samples, 1, dtype=torch.double)
-                }
-            )
+        model.load_mcmc_samples(
+            {
+                "lengthscale": torch.rand(
+                    num_samples,
+                    1,
+                    self.blockX_blockY[0].X.shape[-1],
+                    dtype=torch.double,
+                ),
+                "outputscale": torch.rand(num_samples, dtype=torch.double),
+                "mean": torch.randn(num_samples, dtype=torch.double),
+                "noise": torch.rand(num_samples, 1, dtype=torch.double),
+            }
+        )
 
-            kwargs = func(
-                model=model,
-                training_data=self.blockX_blockY,
-                bounds=self.bounds,
-            )
-            
-            qBayesianQueryByComittee(**kwargs)
+        kwargs = func(
+            model=model,
+            training_data=self.blockX_blockY,
+            bounds=self.bounds,
+        )
+
+        qBayesianQueryByComittee(**kwargs)
 
     def test_construct_inputs_bayesian_variance_reduction(self) -> None:
-            func = get_acqf_input_constructor(qBayesianVarianceReduction)
-            num_samples = 3
-            model = SaasFullyBayesianSingleTaskGP(
-                self.blockX_blockY[0].X, self.blockX_blockY[0].Y)
+        func = get_acqf_input_constructor(qBayesianVarianceReduction)
+        num_samples = 3
+        model = SaasFullyBayesianSingleTaskGP(
+            self.blockX_blockY[0].X, self.blockX_blockY[0].Y
+        )
 
-            model.load_mcmc_samples(
-                {
-                    "lengthscale": torch.rand(
-                        num_samples, 1, self.blockX_blockY[0].X.shape[-1], 
-                        dtype=torch.double
-                    ),
-                    "outputscale": torch.rand(num_samples, dtype=torch.double),
-                    "mean": torch.randn(num_samples, dtype=torch.double),
-                    "noise": torch.rand(num_samples, 1, dtype=torch.double)
-                }
-            )
+        model.load_mcmc_samples(
+            {
+                "lengthscale": torch.rand(
+                    num_samples,
+                    1,
+                    self.blockX_blockY[0].X.shape[-1],
+                    dtype=torch.double,
+                ),
+                "outputscale": torch.rand(num_samples, dtype=torch.double),
+                "mean": torch.randn(num_samples, dtype=torch.double),
+                "noise": torch.rand(num_samples, 1, dtype=torch.double),
+            }
+        )
 
-            kwargs = func(
-                model=model,
-                training_data=self.blockX_blockY,
-                bounds=self.bounds,
-            )
-            
-            qBayesianVarianceReduction(**kwargs)
+        kwargs = func(
+            model=model,
+            training_data=self.blockX_blockY,
+            bounds=self.bounds,
+        )
+
+        qBayesianVarianceReduction(**kwargs)
+
 
 class TestInstantiationFromInputConstructor(InputConstructorBaseTestCase):
     def _test_constructor_base(

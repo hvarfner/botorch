@@ -31,7 +31,7 @@ from botorch.models.gp_regression import MIN_INFERRED_NOISE_LEVEL
 from botorch.models.utils import fantasize as fantasize_flag
 from botorch.sampling import MCSampler
 from botorch.sampling.normal import SobolQMCNormalSampler
-from botorch.utils.transforms import t_batch_mode_transform, concatenate_pending_points
+from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
 
 # The lower bound on the CDF value of the max-values
@@ -140,7 +140,6 @@ class qSelfCorrectingBayesianOptimization(
         cond_covar = posterior.covariance_matrix
         # the mixture variance is squeezed, need it unsqueezed
         marg_covar = posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)
-        marg_var = posterior.mixture_variance.unsqueeze(MCMC_DIM)
         noiseless_var = self.conditional_model.posterior(
             X.unsqueeze(MCMC_DIM), observation_noise=False
         ).variance
@@ -162,8 +161,8 @@ class qSelfCorrectingBayesianOptimization(
         )
         # and add the (possibly heteroskedastic) noise
         var_truncated = var_truncated + (cond_variances - noiseless_var)
-        
-        # truncating the entire covariance matrix is not trivial, so we assume the 
+
+        # truncating the entire covariance matrix is not trivial, so we assume the
         # truncation is proportional on the off-diags as on the diagonals and scale
         # the covariance accordingly for all elements in the q-batch (if there is one)
         # for q=1, this is equivalent to simply truncating the posterior

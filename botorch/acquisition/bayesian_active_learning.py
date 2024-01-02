@@ -11,16 +11,12 @@ from typing import Optional
 
 import torch
 from botorch.acquisition.acquisition import AcquisitionFunction, MCSamplerMixin
-from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.fully_bayesian import MCMC_DIM, SaasFullyBayesianSingleTaskGP
 from botorch.models.model import Model
 from botorch.sampling.base import MCSampler
 from botorch.sampling.normal import SobolQMCNormalSampler
 
-from botorch.utils.stat_dist import (
-    mvn_hellinger_distance,
-    mvn_kl_divergence,
-)
+from botorch.utils.stat_dist import mvn_hellinger_distance, mvn_kl_divergence
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
 
@@ -35,7 +31,7 @@ DISTANCE_METRICS = {
 class FullyBayesianAcquisitionFunction(AcquisitionFunction):
     def __init__(self, model: Model):
         """Base class for acquisition functions which require a Fully Bayesian
-            model treatment.
+        model treatment.
         """
         if model._is_fully_bayesian:
             super().__init__(model)
@@ -66,7 +62,7 @@ class qBayesianVarianceReduction(FullyBayesianAcquisitionFunction):
     def forward(self, X: Tensor) -> Tensor:
         posterior = self.model.posterior(X, observation_noise=True)
         res = torch.logdet(posterior.mixture_covariance_matrix).exp()
-        
+
         # the MCMC dim is averaged out in the mixture postrior,
         # so the result needs to be unsqueeze[d for the averaging
         # in the decorator
@@ -87,7 +83,6 @@ class qBayesianQueryByComittee(FullyBayesianAcquisitionFunction):
         super().__init__(model)
         self.set_X_pending(X_pending)
 
-
     @concatenate_pending_points
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
@@ -96,7 +91,7 @@ class qBayesianQueryByComittee(FullyBayesianAcquisitionFunction):
         marg_mean = posterior.mixture_mean.unsqueeze(MCMC_DIM)
         mean_diff = posterior_mean - marg_mean
         covar_of_mean = torch.matmul(mean_diff, mean_diff.transpose(-1, -2))
-        
+
         res = torch.logdet(covar_of_mean).exp()
         return torch.nan_to_num(res, 0)
 
@@ -112,7 +107,7 @@ class qBayesianActiveLearningByDisagreement(
         sampler: Optional[MCSampler] = None,
         num_samples: int = 64,
     ) -> None:
-        """Batch implementation of BALD: https://arxiv.org/pdf/1906.08158.pdf by 
+        """Batch implementation of BALD: https://arxiv.org/pdf/1906.08158.pdf by
         Kirsch et. al.
 
         Args:
@@ -137,8 +132,9 @@ class qBayesianActiveLearningByDisagreement(
         if estimation_type == "LB":
             self.acq_method = self._compute_lower_bound_information_gain
         else:
-            raise ValueError("Only the 'LB' approximation to BALD is currently"
-                             "avaialable")
+            raise ValueError(
+                "Only the 'LB' approximation to BALD is currently" "avaialable"
+            )
 
     @concatenate_pending_points
     @t_batch_mode_transform()
@@ -149,7 +145,7 @@ class qBayesianActiveLearningByDisagreement(
         posterior = self.model.posterior(X, observation_noise=True)
         marg_covar = posterior.mixture_covariance_matrix
         cond_variances = posterior.variance
-        
+
         prev_entropy = torch.logdet(marg_covar).unsqueeze(-1)
         # squeeze excess dim and mean over q-batch
         post_ub_entropy = torch.log(cond_variances).squeeze(-1).mean(-1)
@@ -201,8 +197,6 @@ class qStatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
         cond_means = posterior.mean
         marg_mean = posterior.mixture_mean.unsqueeze(MCMC_DIM)
         cond_covar = posterior.covariance_matrix
-        cond_var = posterior.variance
-        marg_var = posterior.mixture_variance.unsqueeze(MCMC_DIM)
 
         # the mixture variance is squeezed, need it unsqueezed
         marg_covar = posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)

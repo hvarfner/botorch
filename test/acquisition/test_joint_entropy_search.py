@@ -124,14 +124,3 @@ class TestQJointEntropySearch(BotorchTestCase):
                 maximize=maximize,
             )
             acq_X = acq(test_Xs[j])
-
-        # Support with fully bayesian models is not yet implemented. Thus, we
-        # throw an error for now.
-        fully_bayesian_model = SaasFullyBayesianSingleTaskGP(train_X, train_Y)
-        with self.assertRaises(NotImplementedError):
-            acq = qJointEntropySearch(
-                model=fully_bayesian_model,
-                optimal_inputs=optimal_inputs,
-                optimal_outputs=optimal_outputs,
-                estimation_type="LB",
-            )

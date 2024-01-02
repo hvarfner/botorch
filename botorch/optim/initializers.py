@@ -947,7 +947,7 @@ def gen_optimal_location_initial_conditions(
 
     # other arguments 'sample_around_suggestions_sigma'
     # other arguments 'sample_around_suggestions_fraction'
-    options['suggestions'] = suggested_optima
+    options["suggestions"] = suggested_optima
     ics = gen_batch_initial_conditions(
         acq_function=acq_function,
         bounds=bounds,

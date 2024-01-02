@@ -15,6 +15,7 @@ import torch
 from botorch import settings
 from botorch.acquisition.analytic import PosteriorMean
 from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
+from botorch.acquisition.joint_entropy_search import qJointEntropySearch
 from botorch.acquisition.knowledge_gradient import qKnowledgeGradient
 from botorch.acquisition.monte_carlo import (
     qExpectedImprovement,
@@ -24,10 +25,9 @@ from botorch.acquisition.multi_objective.hypervolume_knowledge_gradient import (
     qHypervolumeKnowledgeGradient,
     qMultiFidelityHypervolumeKnowledgeGradient,
 )
-from botorch.acquisition.joint_entropy_search import qJointEntropySearch
 
 from botorch.acquisition.multi_objective.joint_entropy_search import (
-    qLowerBoundMultiObjectiveJointEntropySearch
+    qLowerBoundMultiObjectiveJointEntropySearch,
 )
 from botorch.acquisition.multi_objective.monte_carlo import (
     qNoisyExpectedHypervolumeImprovement,
@@ -1451,18 +1451,16 @@ class TestGenOptimalLocationInitialConditions(BotorchTestCase):
                 "optimal_outputs": torch.rand(num_optima, 1),
             }
             mock_acq = qJointEntropySearch(model=mm, **acq_kwargs)
-            
-            
+
             mean = torch.zeros(1, 2, device=self.device, dtype=dtype)
             mo_mm = MockModel(MockPosterior(mean=mean))
             mo_acq_kwargs = {
                 "pareto_sets": torch.rand(num_optima, 2),
                 "pareto_fronts": torch.rand(num_optima, 2),
             }
-            
+
             mock_mo_acq = qLowerBoundMultiObjectiveJointEntropySearch(
-                model=mo_mm, 
-                **acq_kwargs
+                model=mo_mm, **acq_kwargs
             )
             bounds = torch.tensor([[0, 0], [1, 1]], device=self.device, dtype=dtype)
             # test option error
@@ -1493,5 +1491,3 @@ class TestGenOptimalLocationInitialConditions(BotorchTestCase):
                 raw_samples=raw_samples,
                 options={"frac_random": 0.5},
             )
-
-

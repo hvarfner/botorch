@@ -45,7 +45,7 @@ from botorch.acquisition.bayesian_active_learning import (
     qBayesianActiveLearningByDisagreement,
     qBayesianQueryByComittee,
     qBayesianVarianceReduction,
-    qStatisticalDistanceActiveLearning
+    qStatisticalDistanceActiveLearning,
 )
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
@@ -1571,6 +1571,7 @@ def construct_inputs_BAL(
     }
     return inputs
 
+
 @acqf_input_constructor(qBayesianActiveLearningByDisagreement)
 def construct_inputs_BALD(
     model: Model,
@@ -1585,6 +1586,7 @@ def construct_inputs_BALD(
         "num_samples": num_samples,
     }
     return inputs
+
 
 @acqf_input_constructor(qStatisticalDistanceActiveLearning)
 def construct_inputs_SAL(
@@ -1602,6 +1604,7 @@ def construct_inputs_SAL(
         "num_samples": num_samples,
     }
     return inputs
+
 
 @acqf_input_constructor(qSelfCorrectingBayesianOptimization)
 def construct_inputs_SCoreBO(
@@ -1633,6 +1636,6 @@ def construct_inputs_SCoreBO(
         "X_pending": X_pending,
         "estimation_type": estimation_type,
         "num_samples": num_samples,
-        "posterior_transform": posterior_transform
+        "posterior_transform": posterior_transform,
     }
     return inputs

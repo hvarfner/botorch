@@ -11,13 +11,9 @@ from botorch.acquisition.scorebo import qSelfCorrectingBayesianOptimization
 from botorch.models.fully_bayesian import SaasFullyBayesianSingleTaskGP
 
 from botorch.models.gp_regression import SingleTaskGP
-from botorch.models.model_list_gp_regression import ModelListGP
 from botorch.models.transforms.outcome import Standardize
 from botorch.sampling.normal import SobolQMCNormalSampler
 from botorch.utils.testing import BotorchTestCase
-
-
-
 
 
 def _get_mcmc_samples(num_samples: int, dim: int, infer_noise: bool, **tkwargs):
@@ -31,26 +27,22 @@ def _get_mcmc_samples(num_samples: int, dim: int, infer_noise: bool, **tkwargs):
         mcmc_samples["noise"] = torch.rand(num_samples, 1, **tkwargs)
     return mcmc_samples
 
-def get_model(
-        train_X, 
-        train_Y, 
-        num_models, 
-        use_model_list, 
-        standardize_model, 
-        infer_noise,
-        **tkwargs,
 
+def get_model(
+    train_X,
+    train_Y,
+    num_models,
+    standardize_model,
+    infer_noise,
+    **tkwargs,
 ):
     num_objectives = train_Y.shape[-1]
 
     if standardize_model:
-        if use_model_list:
-            outcome_transform = Standardize(m=1)
-        else:
-            outcome_transform = Standardize(m=num_objectives)
+        outcome_transform = Standardize(m=num_objectives)
     else:
         outcome_transform = None
-    
+
     mcmc_samples = _get_mcmc_samples(
         num_samples=num_models,
         dim=train_X.shape[-1],
@@ -58,36 +50,21 @@ def get_model(
         **tkwargs,
     )
 
-    if use_model_list:
-        gp1 = SaasFullyBayesianSingleTaskGP(
-            train_X=train_X,
-            train_Y=train_Y[:, i : i + 1],
-            outcome_transform=outcome_transform,
-        )
-        gp1.load_mcmc_samples(mcmc_samples)
-        gp2 = SaasFullyBayesianSingleTaskGP(
-            train_X=train_X,
-            train_Y=train_Y[:, i : i + 1],
-            outcome_transform=outcome_transform,
-        )
-        gp2.load_mcmc_samples(mcmc_samples)
-        model = ModelListGP(gp1, gp2)
-    else:
-        model = SaasFullyBayesianSingleTaskGP(
-            train_X=train_X,
-            train_Y=train_Y,
-            outcome_transform=outcome_transform,
-        )
-        model.load_mcmc_samples(mcmc_samples)
+    model = SaasFullyBayesianSingleTaskGP(
+        train_X=train_X,
+        train_Y=train_Y,
+        outcome_transform=outcome_transform,
+    )
+    model.load_mcmc_samples(mcmc_samples)
 
     return model
 
+
 class TestQSelfCorrectingBayesianOptimization(BotorchTestCase):
-        
     def test_q_self_correcting_bayesian_optimization(self):
         torch.manual_seed(1)
         tkwargs = {"device": self.device}
-        estimation_types = ["LB"] # MC not implemented yet (the other option)
+        estimation_types = ["LB"]  # MC not implemented yet (the other option)
         distance_metrics = ("hellinger", "kl_divergence")
         num_objectives = 1
         num_models = 3
@@ -96,7 +73,6 @@ class TestQSelfCorrectingBayesianOptimization(BotorchTestCase):
             estimation_type,
             distance_metric,
             only_maxval,
-            use_model_list,
             standardize_model,
             maximize,
             infer_noise,
@@ -104,11 +80,10 @@ class TestQSelfCorrectingBayesianOptimization(BotorchTestCase):
             (torch.float, torch.double),
             estimation_types,
             distance_metrics,
-            (False, True), # only_maxval
-            (False, ), # use_model_list
-            (False, True), # standardize_model
-            (False, True), # maximize
-            (True, ), # infer_noise - only one option avail in PyroModels
+            (False, True),  # only_maxval
+            (False, True),  # standardize_model
+            (False, True),  # maximize
+            (True,),  # infer_noise - only one option avail in PyroModels
         ):
             tkwargs["dtype"] = dtype
             input_dim = 2
@@ -119,7 +94,6 @@ class TestQSelfCorrectingBayesianOptimization(BotorchTestCase):
                 train_X,
                 train_Y,
                 num_models,
-                use_model_list,
                 standardize_model,
                 infer_noise,
                 **tkwargs,
@@ -127,20 +101,14 @@ class TestQSelfCorrectingBayesianOptimization(BotorchTestCase):
 
             num_optimal_samples = 7
             optimal_inputs = torch.rand(
-                num_optimal_samples,
-                num_models,
-                input_dim,
-                **tkwargs
+                num_optimal_samples, num_models, input_dim, **tkwargs
             )
 
             # SCoreBO can work with only max-value, so we're testing that too
             if only_maxval:
                 optimal_inputs = None
             optimal_outputs = torch.rand(
-                num_optimal_samples,
-                num_models,
-                num_objectives,
-                **tkwargs
+                num_optimal_samples, num_models, num_objectives, **tkwargs
             )
 
             # test acquisition

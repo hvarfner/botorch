@@ -17,13 +17,9 @@ from botorch.acquisition.bayesian_active_learning import (
 from botorch.models.fully_bayesian import SaasFullyBayesianSingleTaskGP
 
 from botorch.models.gp_regression import SingleTaskGP
-from botorch.models.model_list_gp_regression import ModelListGP
 from botorch.models.transforms.outcome import Standardize
 from botorch.sampling.normal import SobolQMCNormalSampler
 from botorch.utils.testing import BotorchTestCase
-
-
-
 
 
 def _get_mcmc_samples(num_samples: int, dim: int, infer_noise: bool, **tkwargs):
@@ -37,26 +33,22 @@ def _get_mcmc_samples(num_samples: int, dim: int, infer_noise: bool, **tkwargs):
         mcmc_samples["noise"] = torch.rand(num_samples, 1, **tkwargs)
     return mcmc_samples
 
-def get_model(
-        train_X, 
-        train_Y, 
-        num_models, 
-        use_model_list, 
-        standardize_model, 
-        infer_noise,
-        **tkwargs,
 
+def get_model(
+    train_X,
+    train_Y,
+    num_models,
+    standardize_model,
+    infer_noise,
+    **tkwargs,
 ):
     num_objectives = train_Y.shape[-1]
 
     if standardize_model:
-        if use_model_list:
-            outcome_transform = Standardize(m=1)
-        else:
-            outcome_transform = Standardize(m=num_objectives)
+        outcome_transform = Standardize(m=num_objectives)
     else:
         outcome_transform = None
-    
+
     mcmc_samples = _get_mcmc_samples(
         num_samples=num_models,
         dim=train_X.shape[-1],
@@ -64,27 +56,12 @@ def get_model(
         **tkwargs,
     )
 
-    if use_model_list:
-        gp1 = SaasFullyBayesianSingleTaskGP(
-            train_X=train_X,
-            train_Y=train_Y[:, i : i + 1],
-            outcome_transform=outcome_transform,
-        )
-        gp1.load_mcmc_samples(mcmc_samples)
-        gp2 = SaasFullyBayesianSingleTaskGP(
-            train_X=train_X,
-            train_Y=train_Y[:, i : i + 1],
-            outcome_transform=outcome_transform,
-        )
-        gp2.load_mcmc_samples(mcmc_samples)
-        model = ModelListGP(gp1, gp2)
-    else:
-        model = SaasFullyBayesianSingleTaskGP(
-            train_X=train_X,
-            train_Y=train_Y,
-            outcome_transform=outcome_transform,
-        )
-        model.load_mcmc_samples(mcmc_samples)
+    model = SaasFullyBayesianSingleTaskGP(
+        train_X=train_X,
+        train_Y=train_Y,
+        outcome_transform=outcome_transform,
+    )
+    model.load_mcmc_samples(mcmc_samples)
 
     return model
 
@@ -96,11 +73,10 @@ class TestFullyBayesianActuisitionFunction(BotorchTestCase):
 
 
 class TestQStatisticalDistanceActiveLearning(BotorchTestCase):
-        
     def test_q_statistical_distance_active_learning(self):
         torch.manual_seed(1)
         tkwargs = {"device": self.device}
-        estimation_types = ["LB"] # MC not implemented yet (the other option)
+        estimation_types = ["LB"]  # MC not implemented yet (the other option)
         distance_metrics = ("hellinger", "kl_divergence")
         num_objectives = 1
         num_models = 3
@@ -108,16 +84,14 @@ class TestQStatisticalDistanceActiveLearning(BotorchTestCase):
             dtype,
             estimation_type,
             distance_metric,
-            use_model_list,
             standardize_model,
             infer_noise,
         ) in product(
             (torch.float, torch.double),
             estimation_types,
             distance_metrics,
-            (False, ), # use_model_list
-            (False, True), # standardize_model
-            (True, ), # infer_noise - only one option avail in PyroModels
+            (False, True),  # standardize_model
+            (True,),  # infer_noise - only one option avail in PyroModels
         ):
             tkwargs["dtype"] = dtype
             input_dim = 2
@@ -128,20 +102,10 @@ class TestQStatisticalDistanceActiveLearning(BotorchTestCase):
                 train_X,
                 train_Y,
                 num_models,
-                use_model_list,
                 standardize_model,
                 infer_noise,
                 **tkwargs,
             )
-
-            num_optimal_samples = 5
-            optimal_inputs = torch.rand(
-                num_optimal_samples,
-                num_models,
-                input_dim,
-                **tkwargs
-            )
-
 
             # test acquisition
             X_pending_list = [None, torch.rand(2, input_dim, **tkwargs)]
@@ -152,6 +116,7 @@ class TestQStatisticalDistanceActiveLearning(BotorchTestCase):
                     model=model,
                     estimation_type=estimation_type,
                     X_pending=X_pending,
+                    distance_metric=distance_metric,
                 )
                 self.assertIsInstance(acq.sampler, SobolQMCNormalSampler)
 
@@ -194,25 +159,22 @@ class TestQStatisticalDistanceActiveLearning(BotorchTestCase):
 
 
 class TestQBayesianActiveLearningByDisagreement(BotorchTestCase):
-        
     def test_q_bayesian_active_learning_by_disagreement(self):
         torch.manual_seed(1)
         tkwargs = {"device": self.device}
-        estimation_types = ["LB"] # MC not implemented yet (the other option)
+        estimation_types = ["LB"]  # MC not implemented yet (the other option)
         num_objectives = 1
         num_models = 3
         for (
             dtype,
             estimation_type,
-            use_model_list,
             standardize_model,
             infer_noise,
         ) in product(
             (torch.float, torch.double),
             estimation_types,
-            (False, ), # use_model_list
-            (False, True), # standardize_model
-            (True, ), # infer_noise - only one option avail in PyroModels
+            (False, True),  # standardize_model
+            (True,),  # infer_noise - only one option avail in PyroModels
         ):
             tkwargs["dtype"] = dtype
             input_dim = 2
@@ -223,20 +185,10 @@ class TestQBayesianActiveLearningByDisagreement(BotorchTestCase):
                 train_X,
                 train_Y,
                 num_models,
-                use_model_list,
                 standardize_model,
                 infer_noise,
                 **tkwargs,
             )
-
-            num_optimal_samples = 5
-            optimal_inputs = torch.rand(
-                num_optimal_samples,
-                num_models,
-                input_dim,
-                **tkwargs
-            )
-
 
             # test acquisition
             X_pending_list = [None, torch.rand(2, input_dim, **tkwargs)]
@@ -281,22 +233,15 @@ class TestQBayesianActiveLearningByDisagreement(BotorchTestCase):
 
 
 class TestQBayesianQueryByComittee(BotorchTestCase):
-        
     def test_q_bayesian_query_by_comittee(self):
         torch.manual_seed(1)
         tkwargs = {"device": self.device}
         num_objectives = 1
         num_models = 3
-        for (
-            dtype,
-            use_model_list,
-            standardize_model,
-            infer_noise,
-        ) in product(
+        for (dtype, standardize_model, infer_noise,) in product(
             (torch.float, torch.double),
-            (False, ), # use_model_list
-            (False, True), # standardize_model
-            (True, ), # infer_noise - only one option avail in PyroModels
+            (False, True),  # standardize_model
+            (True,),  # infer_noise - only one option avail in PyroModels
         ):
             tkwargs["dtype"] = dtype
             input_dim = 2
@@ -307,18 +252,9 @@ class TestQBayesianQueryByComittee(BotorchTestCase):
                 train_X,
                 train_Y,
                 num_models,
-                use_model_list,
                 standardize_model,
                 infer_noise,
                 **tkwargs,
-            )
-
-            num_optimal_samples = 5
-            optimal_inputs = torch.rand(
-                num_optimal_samples,
-                num_models,
-                input_dim,
-                **tkwargs
             )
 
             # test acquisition
@@ -352,23 +288,17 @@ class TestQBayesianQueryByComittee(BotorchTestCase):
                 model=non_fully_bayesian_model,
             )
 
+
 class TestQBayesianVarianceReduction(BotorchTestCase):
-        
     def test_q_bayesian_variance_reduction(self):
         torch.manual_seed(1)
         tkwargs = {"device": self.device}
         num_objectives = 1
         num_models = 3
-        for (
-            dtype,
-            use_model_list,
-            standardize_model,
-            infer_noise,
-        ) in product(
+        for (dtype, standardize_model, infer_noise,) in product(
             (torch.float, torch.double),
-            (False, ), # use_model_list
-            (False, True), # standardize_model
-            (True, ), # infer_noise - only one option avail in PyroModels
+            (False, True),  # standardize_model
+            (True,),  # infer_noise - only one option avail in PyroModels
         ):
             tkwargs["dtype"] = dtype
             input_dim = 2
@@ -379,20 +309,10 @@ class TestQBayesianVarianceReduction(BotorchTestCase):
                 train_X,
                 train_Y,
                 num_models,
-                use_model_list,
                 standardize_model,
                 infer_noise,
                 **tkwargs,
             )
-
-            num_optimal_samples = 5
-            optimal_inputs = torch.rand(
-                num_optimal_samples,
-                num_models,
-                input_dim,
-                **tkwargs
-            )
-
 
             # test acquisition
             X_pending_list = [None, torch.rand(2, input_dim, **tkwargs)]

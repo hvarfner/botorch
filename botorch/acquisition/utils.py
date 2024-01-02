@@ -486,7 +486,7 @@ def get_optimal_samples(
     model: Model,
     bounds: Tensor,
     num_optima: int,
-    raw_samples: int = 1024,
+    raw_samples: int = 2048,
     num_restarts: int = 20,
     maximize: bool = True,
     use_suggestions: bool = True,
@@ -509,7 +509,7 @@ def get_optimal_samples(
 
     """
     paths = draw_matheron_paths(model, sample_shape=torch.Size([num_optima]))
-    if use_suggestions:
+    if use_suggestions and model.train_inputs[0].ndim == 2:
         suggestions = prune_inferior_points(model, model.train_inputs[0])
     else:
         suggestions = None
