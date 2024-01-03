@@ -1616,7 +1616,6 @@ def construct_inputs_SCoreBO(
     X_pending: Optional[Tensor] = None,
     estimation_type: str = "LB",
     num_samples: int = 64,
-    posterior_transform: Optional[PosteriorTransform] = None,
 ):
     dtype = model.train_targets.dtype
     # the number of optima are per model
@@ -1636,6 +1635,5 @@ def construct_inputs_SCoreBO(
         "X_pending": X_pending,
         "estimation_type": estimation_type,
         "num_samples": num_samples,
-        "posterior_transform": posterior_transform,
     }
     return inputs

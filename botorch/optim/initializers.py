@@ -425,7 +425,6 @@ def gen_batch_initial_conditions(
                     ],
                     dim=0,
                 )
-                breakpoint()
 
             X_rnd = fix_features(X_rnd, fixed_features=fixed_features)
             if fixed_X_fantasies is not None:

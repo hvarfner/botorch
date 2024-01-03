@@ -100,6 +100,7 @@ class qSelfCorrectingBayesianOptimization(
                     self.model.posterior(
                         self.model.train_inputs[0], observation_noise=False
                     )
+
         if optimal_inputs is not None:
             self.optimal_inputs = optimal_inputs.unsqueeze(-2)
             self.conditional_model = self.model.condition_on_observations(
@@ -131,15 +132,15 @@ class qSelfCorrectingBayesianOptimization(
     def forward(self, X: Tensor) -> Tensor:
         # since we have two MC dims (over models and optima), we need to
         # unsqueeze a second dim to accomodate the posterior pass
-        posterior = self.conditional_model.posterior(
-            X.unsqueeze(MCMC_DIM), observation_noise=True
-        )
+        prev_posterior = self.model.posterior(X.unsqueeze(MCMC_DIM))
+        posterior = self.conditional_model.posterior(X.unsqueeze(MCMC_DIM))
         cond_means = posterior.mean
-        marg_mean = cond_means.mean(dim=MCMC_DIM, keepdim=True)
+        marg_mean = prev_posterior.mean.mean(dim=MCMC_DIM, keepdim=True)
         cond_variances = posterior.variance
         cond_covar = posterior.covariance_matrix
+        
         # the mixture variance is squeezed, need it unsqueezed
-        marg_covar = posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)
+        marg_covar = prev_posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)
         noiseless_var = self.conditional_model.posterior(
             X.unsqueeze(MCMC_DIM), observation_noise=False
         ).variance
@@ -152,7 +153,6 @@ class qSelfCorrectingBayesianOptimization(
         )
         cdf_mvs = normal.cdf(normalized_mvs).clamp_min(CLAMP_LB)
         pdf_mvs = torch.exp(normal.log_prob(normalized_mvs))
-
         mean_truncated = cond_means - noiseless_var.sqrt() * pdf_mvs / cdf_mvs
 
         # This is the noiseless variance (i.e. the part that gets truncated)
