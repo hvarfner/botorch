@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from math import ceil
 from typing import Any, Generator, Iterable, List, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
@@ -866,8 +867,7 @@ def optimize_posterior_samples(
     num_restarts: int = 10,
     maximize: bool = True,
     suggestions: Optional[Tensor] = None,
-    suggestions_sigma: Optional[float] = 0.025,
-    **kwargs: Any,
+    **options: Any,
 ) -> Tuple[Tensor, Tensor]:
     r"""Cheaply maximizes posterior samples by random querying followed by vanilla
     gradient descent on the best num_restarts points.
@@ -907,13 +907,27 @@ def optimize_posterior_samples(
             X=suggestions,
             bounds=bounds,
             n_discrete_points=raw_samples,
-            sigma=suggestions_sigma,
+            sigma=options.get("suggestions_sigma", 0.025),
         )
         candidate_set = torch.cat((candidate_set, perturbed_suggestions))
 
-    # queries all samples on all candidates - output shape
-    # raw_samples * num_optima * num_models
-    candidate_queries = path_func(candidate_set)
+
+    # for FullyBayesian models, a batch limit is generally required in order
+    # to avoid memory issues for moderate (1k) number of fourier features
+    # and raw_samples (1k). Batch size of 128 limits memory usage to a 
+    # couple of GB for the standard FB (ensemble of 16 models, each querying a
+    # small number of optima
+
+    batch_limit = options.get("suggestions_sigma", 128)
+    num_batches = ceil(raw_samples / batch_limit)
+    candidate_queries = []
+    for batch_idx in range(num_batches):
+        start_idx, end_idx = (batch_idx * batch_limit), (batch_idx + 1) * batch_limit
+        # queries all samples on all candidates - output shape
+        # raw_samples * num_optima * num_models
+        candidate_queries.append(path_func(candidate_set[start_idx:end_idx]))
+
+    candidate_queries = torch.cat(candidate_queries, dim=-1)
     argtop_k = torch.topk(candidate_queries, num_restarts, dim=-1).indices
     X_top_k = candidate_set[argtop_k, :]
 
@@ -921,7 +935,7 @@ def optimize_posterior_samples(
     from botorch.generation.gen import gen_candidates_torch
 
     X_top_k, f_top_k = gen_candidates_torch(
-        X_top_k, path_func, lower_bounds=bounds[0], upper_bounds=bounds[1], **kwargs
+        X_top_k, path_func, lower_bounds=bounds[0], upper_bounds=bounds[1]
     )
     f_opt, arg_opt = f_top_k.max(dim=-1, keepdim=True)
 
