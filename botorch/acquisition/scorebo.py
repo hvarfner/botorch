@@ -132,13 +132,15 @@ class qSelfCorrectingBayesianOptimization(
     def forward(self, X: Tensor) -> Tensor:
         # since we have two MC dims (over models and optima), we need to
         # unsqueeze a second dim to accomodate the posterior pass
-        prev_posterior = self.model.posterior(X.unsqueeze(MCMC_DIM))
-        posterior = self.conditional_model.posterior(X.unsqueeze(MCMC_DIM))
+        prev_posterior = self.model.posterior(X.unsqueeze(MCMC_DIM), 
+            observation_noise=True)
+        posterior = self.conditional_model.posterior(X.unsqueeze(MCMC_DIM), 
+            observation_noise=True)
         cond_means = posterior.mean
         marg_mean = prev_posterior.mean.mean(dim=MCMC_DIM, keepdim=True)
         cond_variances = posterior.variance
         cond_covar = posterior.covariance_matrix
-        
+
         # the mixture variance is squeezed, need it unsqueezed
         marg_covar = prev_posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)
         noiseless_var = self.conditional_model.posterior(
