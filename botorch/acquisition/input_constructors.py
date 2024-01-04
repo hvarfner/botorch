@@ -1636,6 +1636,5 @@ def construct_inputs_SCoreBO(
         "X_pending": X_pending,
         "estimation_type": estimation_type,
         "num_samples": num_samples,
-        "posterior_transform": posterior_transform,
     }
     return inputs

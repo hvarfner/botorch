@@ -25,6 +25,12 @@ from botorch.acquisition.analytic import (
     qAnalyticProbabilityOfImprovement,
     UpperConfidenceBound,
 )
+from botorch.acquisition.bayesian_active_learning import (
+    qBayesianActiveLearningByDisagreement,
+    qBayesianQueryByComittee,
+    qBayesianVarianceReduction,
+    qStatisticalDistanceActiveLearning,
+)
 from botorch.acquisition.cost_aware import (
     GenericCostAwareUtility,
     InverseCostWeightedUtility,
@@ -74,6 +80,7 @@ from botorch.acquisition.preference import (
 )
 from botorch.acquisition.prior_guided import PriorGuidedAcquisitionFunction
 from botorch.acquisition.proximal import ProximalAcquisitionFunction
+from botorch.acquisition.scorebo import qSelfCorrectingBayesianOptimization
 
 __all__ = [
     "AcquisitionFunction",
@@ -99,6 +106,10 @@ __all__ = [
     "UpperConfidenceBound",
     "qAnalyticProbabilityOfImprovement",
     "qExpectedImprovement",
+    "qBayesianActiveLearningByDisagreement",
+    "qBayesianQueryByComittee",
+    "qBayesianVarianceReduction",
+    "qStatisticalDistanceActiveLearning",
     "LogImprovementMCAcquisitionFunction",
     "qLogExpectedImprovement",
     "qLogNoisyExpectedImprovement",
@@ -115,6 +126,7 @@ __all__ = [
     "qProbabilityOfImprovement",
     "qSimpleRegret",
     "qUpperConfidenceBound",
+    "qSelfCorrectingBayesianOptimization",
     "ConstrainedMCObjective",
     "GenericMCObjective",
     "IdentityMCObjective",

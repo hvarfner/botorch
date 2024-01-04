@@ -4,6 +4,37 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+r"""
+Acquisition functions for Bayesian active learning.
+
+References
+
+.. [mackay1992alm]
+    D. MacKay.
+    Information-Based Objective Functions for Active Data Selection.
+    Neural Computation, 1992.
+.. [houlsby2011bald]
+    N. Houlsby, F. Huszár, Z. Ghahramani, M. Lengyel.
+    Bayesian Active Learning for Classification and Preference Learning.
+    NIPS Workshop on Bayesian optimization, experimental design and bandits:
+    Theory and applications, 2011.
+.. [kirsch2011batchbald]
+    Andreas Kirsch, Joost van Amersfoort, Yarin Gal.
+    BatchBALD: Efficient and Diverse Batch Acquisition for Deep Bayesian
+    Active Learning.
+    In Proceedings of the Annual Conference on Neural Information
+    Processing Systems (NeurIPS), 2019.
+.. [riis2022fbgp]
+    C. Riis, F. Antunes, F. Hüttel, C. Azevedo, F. Pereira.
+    Bayesian Active Learning with Fully Bayesian Gaussian Processes.
+    In Proceedings of the Annual Conference on Neural Information
+    Processing Systems (NeurIPS), 2022.
+.. [Hvarfner2023scorebo]
+    C. Hvarfner, F. Hutter, L. Nardi,
+    Self-Correcting Bayesian Optimization thorugh Bayesian Active Learning.
+    In Proceedings of the Annual Conference on Neural Information
+    Processing Systems (NeurIPS), 2023.
+"""
 
 from __future__ import annotations
 
@@ -32,6 +63,9 @@ class FullyBayesianAcquisitionFunction(AcquisitionFunction):
     def __init__(self, model: Model):
         """Base class for acquisition functions which require a Fully Bayesian
         model treatment.
+
+        Args:
+            model: A fully bayesian single-outcome model.
         """
         if model._is_fully_bayesian:
             super().__init__(model)
@@ -49,10 +83,12 @@ class qBayesianVarianceReduction(FullyBayesianAcquisitionFunction):
         model: SaasFullyBayesianSingleTaskGP,
         X_pending: Optional[Tensor] = None,
     ) -> None:
-        """_summary_
+        """Global variance reduction with fully Bayesian hyperparameter treatment by
+        [mackay1992alm]_.
 
         Args:
-            model (Model): A SaasFullyBayesianSingleTaskGP.
+            model: A fully bayesian single-outcome model.
+            X_pending: A `batch_shape, m x d`-dim Tensor of `m` design points.
         """
         super().__init__(model)
         self.set_X_pending(X_pending)
@@ -76,9 +112,12 @@ class qBayesianQueryByComittee(FullyBayesianAcquisitionFunction):
         X_pending: Optional[Tensor] = None,
     ) -> None:
         """
+        Bayesian Query-By-Comittee [riis2022fbgp]_, which minimizes the variance
+        of the mean in the posterior.
 
         Args:
-            model (Model): _description_
+            model: A fully bayesian single-outcome model.
+            X_pending: A `batch_shape, m x d`-dim Tensor of `m` design points
         """
         super().__init__(model)
         self.set_X_pending(X_pending)
@@ -107,18 +146,20 @@ class qBayesianActiveLearningByDisagreement(
         sampler: Optional[MCSampler] = None,
         num_samples: int = 64,
     ) -> None:
-        """Batch implementation of BALD: https://arxiv.org/pdf/1906.08158.pdf by
-        Kirsch et. al.
+        """Batch implementation [kirsch2019batchbald]_ of BALD [houlsby2011bald]_,
+        which maximizes the mutual information between the next observation and the
+        hyperparameters of the model.
 
         Args:
-            model (Model): A SAASFullyBayesianSingleTaskGP.
-            X_pending (Optional[Tensor], optional): _description_. Defaults to None.
-            estimation_type (str, optional): _description_. Defaults to "MC".
-            sampler (Optional[MCSampler], optional): _description_. Defaults to None.
-            num_samples (int, optional): _description_. Defaults to 64.
-
-        Raises:
-            ValueError: _description_
+            model: A fully bayesian single-outcome model.
+            X_pending: A `batch_shape, m x d`-dim Tensor of `m` design points
+            estimation_type: estimation_type: A string to determine which entropy
+                estimate is computed: Lower bound" ("LB") or "Monte Carlo" ("MC")
+                (not implemented yet).
+            sampler: MCSampler for Monte Carlo estimation of the statistical distance
+                (not implemented yet).
+            num_samples (int, optional): Number of samples if employing monte carlo
+                estimation of the statistical distance. Defaults to 64.
         """
         super().__init__(model)
         if estimation_type not in ["LB"]:
@@ -163,17 +204,23 @@ class qStatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
         sampler: Optional[MCSampler] = None,
         num_samples: int = 64,
     ) -> None:
-        """_summary_
+        """Batch implementation of SAL [hvarfner2023scorebo]_, which minimizes
+        discrepancy in the posterior predictive as measured by a statistical
+        distance (or semi-metric).
 
         Args:
-            model (Model): A SAASFullyBayesianSingleTaskGP.
-            X_pending (Optional[Tensor], optional): _description_. Defaults to None.
-            distance_metric (str, optional): _description_. Defaults to "MC".
-            sampler (Optional[MCSampler], optional): _description_. Defaults to None.
-            num_samples (int, optional): _description_. Defaults to 64.
-
-        Raises:
-            ValueError: _description_
+            model: A fully bayesian single-outcome model.
+            X_pending: A `batch_shape, m x d`-dim Tensor of `m` design points
+            distance_metric (str, optional): The distance metric used. Defaults to
+                "hellinger".
+            estimation_type: estimation_type: A string to determine which entropy
+                estimate is computed: Lower bound" ("LB") or "Monte Carlo" ("MC")
+                (not implemented yet).
+                Lower Bound is recommended due to the comparable empirical performance.
+            sampler: MCSampler for Monte Carlo estimation of the statistical distance
+                (not implemented yet).
+            num_samples (int, optional): Number of samples if employing monte carlo
+                estimation of the statistical distance. Defaults to 64.
         """
         super().__init__(model)
         # Currently only supports LB (lower bound) estimation, will add MC later on
@@ -191,6 +238,7 @@ class qStatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
             )
         self.distance = DISTANCE_METRICS[distance_metric]
 
+    @concatenate_pending_points
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
         posterior = self.model.posterior(X, observation_noise=True)

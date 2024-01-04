@@ -1,12 +1,19 @@
+#!/usr/bin/env python3
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
 r"""
 Acquisition function for Self-Correcting Bayesian Optimization (SCoreBO).
 
+References
+
 .. [Hvarfner2023scorebo]
-    C. Hvarfner, F. Hutter, L. Nardi,
+    C. Hvarfner, E. Hellsten, F. Hutter, L. Nardi.
     Self-Correcting Bayesian Optimization thorugh Bayesian Active Learning.
     In Proceedings of the Annual Conference on Neural Information
     Processing Systems (NeurIPS), 2023.
-
 """
 
 from __future__ import annotations
@@ -23,7 +30,6 @@ from botorch.acquisition.bayesian_active_learning import (
     FullyBayesianAcquisitionFunction,
 )
 
-from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.fully_bayesian import MCMC_DIM, SaasFullyBayesianSingleTaskGP
 
 from botorch.models.gp_regression import MIN_INFERRED_NOISE_LEVEL
@@ -50,29 +56,31 @@ class qSelfCorrectingBayesianOptimization(
         distance_metric: str = "hellinger",
         estimation_type: str = "LB",
         sampler: Optional[MCSampler] = None,
-        posterior_transform: Optional[PosteriorTransform] = None,
         num_samples: int = 64,
         maximize: bool = True,
     ) -> None:
-        r"""Joint entropy search acquisition function.
+        r"""Self-correcting Bayesian optimization [hvarfner2023scorebo]_ acquisition
+        function. SCoreBO seeks to find accurate hyperparameters during the course
+        of optimization by incorporating an active learning-like objective into
+        optimization.
 
         Args:
-            model: A fitted single-outcome model.
+            model: A fully bayesian model single-outcome model.
             optimal_inputs: A `num_samples x num_models x d`-dim tensor containing
                 the sampled optimal inputs of dimension `d`.
             optimal_outputs: A `num_samples x num_models x 1`-dim Tensor containing
                 the optimal objective values.
-            X_pending (Optional[Tensor], optional): _description_. Defaults to None.
-            distance_metric (str, optional): The distance metric used to calculate
-            disagreement in the posterior. Defaults to "hellinger" (recommended).
+            X_pending: A `batch_shape, m x d`-dim Tensor of `m` design points
+            distance_metric (str, optional): The distance metric used. Defaults to
+                "hellinger".
             estimation_type: estimation_type: A string to determine which entropy
-                estimate is computed: Lower bound" ("LB") or "Monte Carlo" ("MC").
+                estimate is computed: Lower bound" ("LB") or "Monte Carlo" ("MC")
+                (not implemented yet).
                 Lower Bound is recommended due to the comparable empirical performance.
-            maximize: If true, we consider a maximization problem.
-            X_pending: A `m x d`-dim Tensor of `m` design points that have been
-                submitted for function evaluation, but have not yet been evaluated.
-            num_samples: The number of Monte Carlo samples used for the Monte Carlo
-                estimate.
+            sampler: MCSampler for Monte Carlo estimation of the statistical distance
+                (not implemented yet).
+            num_samples (int, optional): Number of samples if employing monte carlo
+                estimation of the statistical distance. Defaults to 64.
         """
 
         super().__init__(model=model)
@@ -82,7 +90,6 @@ class qSelfCorrectingBayesianOptimization(
 
         # To enable fully bayesian GP conditioning, we need to unsqueeze
         # to get num_optima x num_gps unique GPs
-        self.posterior_transform = posterior_transform
         self.maximize = maximize
         if not self.maximize:
             optimal_outputs = -optimal_outputs
@@ -100,6 +107,7 @@ class qSelfCorrectingBayesianOptimization(
                     self.model.posterior(
                         self.model.train_inputs[0], observation_noise=False
                     )
+
         if optimal_inputs is not None:
             self.optimal_inputs = optimal_inputs.unsqueeze(-2)
             self.conditional_model = self.model.condition_on_observations(
@@ -131,15 +139,19 @@ class qSelfCorrectingBayesianOptimization(
     def forward(self, X: Tensor) -> Tensor:
         # since we have two MC dims (over models and optima), we need to
         # unsqueeze a second dim to accomodate the posterior pass
+        prev_posterior = self.model.posterior(
+            X.unsqueeze(MCMC_DIM), observation_noise=True
+        )
         posterior = self.conditional_model.posterior(
             X.unsqueeze(MCMC_DIM), observation_noise=True
         )
         cond_means = posterior.mean
-        marg_mean = cond_means.mean(dim=MCMC_DIM, keepdim=True)
+        marg_mean = prev_posterior.mean.mean(dim=MCMC_DIM, keepdim=True)
         cond_variances = posterior.variance
         cond_covar = posterior.covariance_matrix
+
         # the mixture variance is squeezed, need it unsqueezed
-        marg_covar = posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)
+        marg_covar = prev_posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)
         noiseless_var = self.conditional_model.posterior(
             X.unsqueeze(MCMC_DIM), observation_noise=False
         ).variance
@@ -152,7 +164,6 @@ class qSelfCorrectingBayesianOptimization(
         )
         cdf_mvs = normal.cdf(normalized_mvs).clamp_min(CLAMP_LB)
         pdf_mvs = torch.exp(normal.log_prob(normalized_mvs))
-
         mean_truncated = cond_means - noiseless_var.sqrt() * pdf_mvs / cdf_mvs
 
         # This is the noiseless variance (i.e. the part that gets truncated)

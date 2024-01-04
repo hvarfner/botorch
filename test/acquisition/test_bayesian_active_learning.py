@@ -165,12 +165,7 @@ class TestQBayesianActiveLearningByDisagreement(BotorchTestCase):
         estimation_types = ["LB"]  # MC not implemented yet (the other option)
         num_objectives = 1
         num_models = 3
-        for (
-            dtype,
-            estimation_type,
-            standardize_model,
-            infer_noise,
-        ) in product(
+        for (dtype, estimation_type, standardize_model, infer_noise,) in product(
             (torch.float, torch.double),
             estimation_types,
             (False, True),  # standardize_model
