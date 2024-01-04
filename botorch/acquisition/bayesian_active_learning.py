@@ -191,6 +191,7 @@ class qStatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
             )
         self.distance = DISTANCE_METRICS[distance_metric]
 
+    @concatenate_pending_points
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
         posterior = self.model.posterior(X, observation_noise=True)
@@ -201,7 +202,7 @@ class qStatisticalDistanceActiveLearning(FullyBayesianAcquisitionFunction):
         # the mixture variance is squeezed, need it unsqueezed
         marg_covar = posterior.mixture_covariance_matrix.unsqueeze(MCMC_DIM)
         dist = self.distance(cond_means, marg_mean, cond_covar, marg_covar)
-
+        
         # squeeze output dim - batch dim computed and reduced inside of dist
         # MCMC dim is averaged in decorator
         return dist.squeeze(-1)
