@@ -48,6 +48,7 @@ from botorch.acquisition.bayesian_active_learning import (
     qStatisticalDistanceActiveLearning,
 )
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
+from botorch.acquisition.diversity import qDistanceWeightedImprovementOverThreshold
 from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
 from botorch.acquisition.joint_entropy_search import qJointEntropySearch
 from botorch.acquisition.knowledge_gradient import (
@@ -1638,3 +1639,58 @@ def construct_inputs_SCoreBO(
         "num_samples": num_samples,
     }
     return inputs
+
+
+@acqf_input_constructor(qDistanceWeightedImprovementOverThreshold)
+def construct_inputs_qDWIT(
+    model: Model,
+    training_data: MaybeDict[SupervisedDataset],
+    objective_thresholds: Optional[Tensor],
+    objective: Optional[MCAcquisitionObjective] = None,
+    posterior_transform: Optional[PosteriorTransform] = None,
+    X_pending: Optional[Tensor] = None,
+    sampler: Optional[MCSampler] = None,
+    tau: float = 1e-3,
+    best_f: Optional[Union[float, Tensor]] = None,
+    constraints: Optional[List[Callable[[Tensor], Tensor]]] = None,
+    eta: Union[Tensor, float] = 1e-3,
+) -> Dict[str, Any]:
+    r"""Construct kwargs for the `qProbabilityOfImprovement` constructor.
+
+    Args:
+        model: The model to be used in the acquisition function.
+        training_data: Dataset(s) used to train the model.
+        objective: The objective to be used in the acquisition function.
+        posterior_transform: The posterior transform to be used in the
+            acquisition function.
+        X_pending: A `m x d`-dim Tensor of `m` design points that have been
+            submitted for function evaluation but have not yet been evaluated.
+            Concatenated into X upon forward call.
+        sampler: The sampler used to draw base samples. If omitted, uses
+            the acquisition functions's default sampler.
+        tau: The temperature parameter used in the sigmoid approximation
+            of the step function. Smaller values yield more accurate
+            approximations of the function, but result in gradients
+            estimates with higher variance.
+        best_f: The best objective value observed so far (assumed noiseless). Can
+            be a `batch_shape`-shaped tensor, which in case of a batched model
+            specifies potentially different values for each element of the batch.
+        constraints: A list of constraint callables which map a Tensor of posterior
+            samples of dimension `sample_shape x batch-shape x q x m`-dim to a
+            `sample_shape x batch-shape x q`-dim Tensor. The associated constraints
+            are considered satisfied if the output is less than zero.
+        eta: Temperature parameter(s) governing the smoothness of the sigmoid
+            approximation to the constraint indicators. For more details, on this
+            parameter, see the docs of `compute_smoothed_feasibility_indicator`.
+
+    Returns:
+        A dict mapping kwarg names of the constructor to values.
+    """
+    return {
+        "model": model,
+        "objective_thresholds": objective_thresholds,
+        "X_pending": X_pending,
+        "sampler": sampler,
+        "tau": tau,
+        "eta": eta,
+    }

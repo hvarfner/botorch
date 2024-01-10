@@ -9,7 +9,6 @@ from typing import Callable, List, Optional, Protocol, Tuple, Union
 
 import torch
 from botorch.acquisition.acquisition import AcquisitionFunction, MCSamplerMixin
-from botorch.acquisition.cached_cholesky import CachedCholeskyMCSamplerMixin
 from botorch.acquisition.objective import (
     ConstrainedMCObjective,
     IdentityMCObjective,
@@ -32,7 +31,7 @@ from botorch.utils.transforms import (
 )
 from torch import Tensor
 
-class qDistanceWeightedImprovementOverThreshold(MCAcquisitionFunction): #qDWIT
+class qDistanceWeightedImprovementOverThreshold(AcquisitionFunction, MCSamplerMixin): #qDWIT
     r"""MC-based batch Probability of Improvement.
 
     Estimates the probability of improvement over the current best observed
@@ -54,14 +53,11 @@ class qDistanceWeightedImprovementOverThreshold(MCAcquisitionFunction): #qDWIT
     def __init__(
         self,
         model: Model,
-        reference: Union[float, Tensor],
-        X_baseline: Tensor,
+        objective_thresholds: Optional[Union[float, Tensor]] = None,
         sampler: Optional[MCSampler] = None,
         objective: Optional[MCAcquisitionObjective] = None,
-        posterior_transform: Optional[PosteriorTransform] = None,
         X_pending: Optional[Tensor] = None,
         tau: float = 1e-3,
-        constraints: Optional[List[Callable[[Tensor], Tensor]]] = None,
         eta: Union[Tensor, float] = 1e-3,
     ) -> None:
         r"""q-Probability of Improvement.
@@ -93,22 +89,40 @@ class qDistanceWeightedImprovementOverThreshold(MCAcquisitionFunction): #qDWIT
                 approximation to the constraint indicators. For more details, on this
                 parameter, see the docs of `compute_smoothed_feasibility_indicator`.
         """
-        super().__init__(
-            model=model,
-            sampler=sampler,
-            objective=objective,
-            posterior_transform=posterior_transform,
-            X_pending=X_pending,
-            constraints=constraints,
-            eta=eta,
-        )
-        reference = torch.as_tensor(reference, dtype=float).unsqueeze(-1)  # adding batch dim
+        super().__init__(model=model)
+        MCSamplerMixin.__init__(self, sampler=sampler)
+
+        if objective is None:
+            objective = IdentityMCObjective()
+        self.objective: MCAcquisitionObjective = objective
+        self.set_X_pending(X_pending)
+
+        reference = torch.as_tensor(objective_thresholds, dtype=float)  # adding batch dim
         self.register_buffer("reference", reference)
         self.register_buffer("tau", torch.as_tensor(tau, dtype=float))
         training_data = model.train_inputs[0]
-        better_than_ref = torch.all(model.train_targets > self.reference, dim=1)
-        self.X_baseline = training_data[better_than_ref]
+        if training_data.ndim == 3: 
+            # if multiobjective, we want to reduce the (identical sets of) training data
+            training_data = training_data[0]
 
+        better_than_ref = torch.all(model.train_targets > self.reference.unsqueeze(-1), dim=0)
+        self.X_baseline = training_data[better_than_ref]
+        print(self.X_baseline)
+        
+    def _get_samples_and_objectives(self, X: Tensor) -> Tuple[Tensor, Tensor]:
+        """Computes posterior samples and objective values at input X.
+
+        Args:
+            X: A `batch_shape x q x d`-dim Tensor of model inputs.
+
+        Returns:
+            A two-tuple `(samples, obj)`, where `samples` is a tensor of posterior
+            samples with shape `sample_shape x batch_shape x q x m`, and `obj` is a
+            tensor of MC objective values with shape `sample_shape x batch_shape x q`.
+        """
+        posterior = self.model.posterior(X=X)
+        samples = self.get_posterior_samples(posterior)
+        return samples, samples
 
     #@concatenate_pending_points
     @t_batch_mode_transform()
@@ -122,13 +136,18 @@ class qDistanceWeightedImprovementOverThreshold(MCAcquisitionFunction): #qDWIT
             A `sample_shape x batch_shape x q`-dim Tensor of improvement indicators.
         """
         if self.X_pending is not None:
-            baseline = torch.cat(self.X_baseline, self.X_pending)
+            baseline = torch.cat((self.X_baseline, self.X_pending))
         else: 
             baseline = self.X_baseline
+    
         _, obj = self._get_samples_and_objectives(X)
-
         improvement = obj - self.reference.to(obj)
-        prob_imp = torch.sigmoid(improvement / self.tau)
-        dist = torch.norm(X - baseline, p=2, dim=-1).min(dim=-2)
-        return prob_imp * dist
+        prob_imp = torch.sigmoid(improvement / self.tau).prod(dim=-1)
+        
+        if len(baseline) == 0:
+            # mean over MC dim and sum over q-batch
+            return prob_imp.mean(0).sum(-1)
+        
+        dist = torch.pow(torch.norm(X - baseline, p=2, dim=-1).min(dim=-1, keepdim=True).values, 2)
+        return (prob_imp * dist).mean(0).sum(-1)
 
