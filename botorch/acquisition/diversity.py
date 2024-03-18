@@ -107,7 +107,6 @@ class qDistanceWeightedImprovementOverThreshold(AcquisitionFunction, MCSamplerMi
 
         better_than_ref = torch.all(model.train_targets > self.reference.unsqueeze(-1), dim=0)
         self.X_baseline = training_data[better_than_ref]
-        print(self.X_baseline)
         
     def _get_samples_and_objectives(self, X: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes posterior samples and objective values at input X.
