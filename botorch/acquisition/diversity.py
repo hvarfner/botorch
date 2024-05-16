@@ -147,6 +147,6 @@ class qDistanceWeightedImprovementOverThreshold(AcquisitionFunction, MCSamplerMi
             # mean over MC dim and sum over q-batch
             return prob_imp.mean(0).sum(-1)
         
-        dist = torch.pow(torch.norm(X - baseline, p=2, dim=-1).min(dim=-1, keepdim=True).values, 2)
+        dist = torch.norm(X - baseline, p=2, dim=-1).min(dim=-1, keepdim=True).values
         return (prob_imp * dist).mean(0).sum(-1)
 
