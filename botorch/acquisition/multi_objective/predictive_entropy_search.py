@@ -98,7 +98,7 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
     def __init__(
         self,
         model: Model,
-        pareto_sets: Tensor,
+        optimal_inputs: Tensor,
         maximize: bool = True,
         X_pending: Tensor | None = None,
         max_ep_iterations: int = 250,
@@ -110,7 +110,7 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
 
         Args:
             model: A fitted batched model with `M` number of outputs.
-            pareto_sets: A `num_pareto_samples x P x d`-dim tensor containing the
+            optimal_inputs: A `num_optimal_inputs x P x d`-dim tensor containing the
                 Pareto optimal set of inputs, where `P` is the number of pareto
                 optimal points. The points in each sample have to be discrete
                 otherwise expectation propagation will fail.
@@ -146,19 +146,19 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
                 "Batch GP models (e.g. fantasized models) are not supported."
             )
 
-        if pareto_sets.ndim != 3 or pareto_sets.shape[-1] != train_X.shape[-1]:
+        if optimal_inputs.ndim != 3 or optimal_inputs.shape[-1] != train_X.shape[-1]:
             raise UnsupportedError(
                 "The Pareto set should have a shape of "
-                "`num_pareto_samples x num_pareto_points x input_dim`."
+                "`num_optimal_samples x num_pareto_points x input_dim`."
             )
         else:
-            self.pareto_sets = pareto_sets
+            self.optimal_inputs = optimal_inputs
 
         # add the pareto set to the existing training data
-        self.num_pareto_samples = pareto_sets.shape[0]
+        self.num_optimal_samples = optimal_inputs.shape[0]
 
         self.augmented_X = torch.cat(
-            [train_X.repeat(self.num_pareto_samples, 1, 1), self.pareto_sets], dim=-2
+            [train_X.repeat(self.num_optimal_samples, 1, 1), self.optimal_inputs], dim=-2
         )
         self.max_ep_iterations = max_ep_iterations
         self.ep_jitter = ep_jitter
@@ -186,8 +186,8 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
 
         tkwargs = {"dtype": train_X.dtype, "device": train_X.device}
         N = len(train_X)
-        num_pareto_samples = self.num_pareto_samples
-        P = self.pareto_sets.shape[-2]
+        num_optimal_samples = self.num_optimal_samples
+        P = self.optimal_inputs.shape[-2]
 
         # initialize the predictive natural mean and variances
         (
@@ -209,10 +209,10 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
         pred_f_nat_cov = pred_nat_cov[..., 0:M, :, :]
 
         # initialize the marginals
-        # `num_pareto_samples x M x (N + P)`
+        # `num_optimal_samples x M x (N + P)`
         mean_f = pred_f_mean.clone()
         nat_mean_f = pred_f_nat_mean.clone()
-        # `num_pareto_samples x M x (N + P) x (N + P)`
+        # `num_optimal_samples x M x (N + P) x (N + P)`
         cov_f = pred_f_cov.clone()
         nat_cov_f = pred_f_nat_cov.clone()
 
@@ -220,17 +220,17 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
         # are optimal in the feasible space i.e. any point in the feasible space
         # should not dominate the Pareto efficient points.
 
-        # `num_pareto_samples x M x (N + P) x P x 2`
-        omega_f_nat_mean = torch.zeros((num_pareto_samples, M, N + P, P, 2), **tkwargs)
-        # `num_pareto_samples x M x (N + P) x P x 2 x 2`
+        # `num_optimal_samples x M x (N + P) x P x 2`
+        omega_f_nat_mean = torch.zeros((num_optimal_samples, M, N + P, P, 2), **tkwargs)
+        # `num_optimal_samples x M x (N + P) x P x 2 x 2`
         omega_f_nat_cov = torch.zeros(
-            (num_pareto_samples, M, N + P, P, 2, 2), **tkwargs
+            (num_optimal_samples, M, N + P, P, 2, 2), **tkwargs
         )
 
         ###########################################################################
         # EXPECTATION PROPAGATION
         ###########################################################################
-        damping = torch.ones(num_pareto_samples, M, **tkwargs)
+        damping = torch.ones(num_optimal_samples, M, **tkwargs)
 
         iteration = 0
         while (torch.sum(damping) > 0) and (iteration < self.max_ep_iterations):
@@ -346,15 +346,15 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
             N = len(self.model.train_inputs[0][0])
         else:
             N = len(self.model.train_inputs[0])
-        P = self.pareto_sets.shape[-2]
-        num_pareto_samples = self.num_pareto_samples
+        P = self.optimal_inputs.shape[-2]
+        num_optimal_samples = self.num_optimal_samples
         ###########################################################################
         # AUGMENT X WITH THE SAMPLED PARETO SET
         ###########################################################################
-        new_shape = batch_shape + torch.Size([num_pareto_samples]) + X.shape[-2:]
+        new_shape = batch_shape + torch.Size([num_optimal_samples]) + X.shape[-2:]
         expanded_X = X.unsqueeze(-3).expand(new_shape)
-        expanded_ps = self.pareto_sets.expand(X.shape[0:-2] + self.pareto_sets.shape)
-        # `batch_shape x num_pareto_samples x (q + P) x d`
+        expanded_ps = self.optimal_inputs.expand(X.shape[0:-2] + self.optimal_inputs.shape)
+        # `batch_shape x num_optimal_samples x (q + P) x d`
         aug_X = torch.cat([expanded_X, expanded_ps], dim=-2)
 
         ###########################################################################
@@ -392,13 +392,13 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
         ###########################################################################
         # INITIALIZE THE EP FACTORS
         ###########################################################################
-        # `batch_shape x num_pareto_samples x M x (q + P) x P x 2`
+        # `batch_shape x num_optimal_samples x M x (q + P) x P x 2`
         omega_f_nat_mean = torch.zeros(
-            batch_shape + torch.Size([num_pareto_samples, M, q + P, P, 2]), **tkwargs
+            batch_shape + torch.Size([num_optimal_samples, M, q + P, P, 2]), **tkwargs
         )
-        # `batch_shape x num_pareto_samples x M x (q + P) x P x 2 x 2`
+        # `batch_shape x num_optimal_samples x M x (q + P) x P x 2 x 2`
         omega_f_nat_cov = torch.zeros(
-            batch_shape + torch.Size([num_pareto_samples, M, q + P, P, 2, 2]), **tkwargs
+            batch_shape + torch.Size([num_optimal_samples, M, q + P, P, 2, 2]), **tkwargs
         )
         ###########################################################################
         # RUN EP ONCE
@@ -442,7 +442,7 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
         ###########################################################################
         # # update damping of objectives
         damping = torch.ones(
-            batch_shape + torch.Size([num_pareto_samples, M]), **tkwargs
+            batch_shape + torch.Size([num_optimal_samples, M]), **tkwargs
         )
         damping, cholesky_nat_cov_f_new = _update_damping(
             nat_cov=pred_f_nat_cov,
@@ -1119,23 +1119,23 @@ def _augment_factors_with_cached_factors(
     Args:
         q: The batch size.
         N: The number of training points.
-        omega_f_nat_mean: A `batch_shape x num_pareto_samples x M x (q + P) x P x 2`
+        omega_f_nat_mean: A `batch_shape x num_optimal_samples x M x (q + P) x P x 2`
             -dim Tensor containing the omega natural mean for the objective at `X`.
-        cached_omega_f_nat_mean: A `num_pareto_samples x M x (N + P) x P x 2`-dim
+        cached_omega_f_nat_mean: A `num_optimal_samples x M x (N + P) x P x 2`-dim
             Tensor containing the omega natural mean for the objective at `X`.
-        omega_f_nat_cov: A `batch_shape x num_pareto_samples x M x (q + P) x P x 2
+        omega_f_nat_cov: A `batch_shape x num_optimal_samples x M x (q + P) x P x 2
             x 2` -dim Tensor containing the omega natural covariance for the
             objective at `X`.
-        cached_omega_f_nat_cov: A `num_pareto_samples x M x (N + P) x P x 2 x 2`-dim
+        cached_omega_f_nat_cov: A `num_optimal_samples x M x (N + P) x P x 2 x 2`-dim
             Tensor containing the omega covariance mean for the objective at `X`.
 
     Returns:
         A two-element tuple containing
 
-        - omega_f_nat_mean_new: A `batch_shape x num_pareto_samples x M x (q + P)
+        - omega_f_nat_mean_new: A `batch_shape x num_optimal_samples x M x (q + P)
             x P x 2`-dim Tensor containing the omega natural mean for the objective
             at `X`.
-        - omega_f_nat_cov_new: A `batch_shape x num_pareto_samples x M x (q + P) x
+        - omega_f_nat_cov_new: A `batch_shape x num_optimal_samples x M x (q + P) x
             P x 2 x 2`-dim Tensor containing the omega natural covariance for the
             objective at `X`.
     """
@@ -1166,7 +1166,7 @@ def _compute_log_determinant(cov: Tensor, q: int) -> Tensor:
     matrices averaged over the Pareto samples.
 
     Args:
-        cov: A `batch_shape x num_pareto_samples x num_outputs x (q + P) x (q + P)`
+        cov: A `batch_shape x num_optimal_samples x num_outputs x (q + P) x (q + P)`
             -dim Tensor containing the covariance matrices.
         q: The batch size.
 
