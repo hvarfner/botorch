@@ -158,7 +158,8 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
         self.num_optimal_samples = optimal_inputs.shape[0]
 
         self.augmented_X = torch.cat(
-            [train_X.repeat(self.num_optimal_samples, 1, 1), self.optimal_inputs], dim=-2
+            [train_X.repeat(self.num_optimal_samples, 1, 1), self.optimal_inputs],
+            dim=-2,
         )
         self.max_ep_iterations = max_ep_iterations
         self.ep_jitter = ep_jitter
@@ -353,7 +354,9 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
         ###########################################################################
         new_shape = batch_shape + torch.Size([num_optimal_samples]) + X.shape[-2:]
         expanded_X = X.unsqueeze(-3).expand(new_shape)
-        expanded_ps = self.optimal_inputs.expand(X.shape[0:-2] + self.optimal_inputs.shape)
+        expanded_ps = self.optimal_inputs.expand(
+            X.shape[0:-2] + self.optimal_inputs.shape
+        )
         # `batch_shape x num_optimal_samples x (q + P) x d`
         aug_X = torch.cat([expanded_X, expanded_ps], dim=-2)
 
@@ -398,7 +401,8 @@ class qMultiObjectivePredictiveEntropySearch(AcquisitionFunction):
         )
         # `batch_shape x num_optimal_samples x M x (q + P) x P x 2 x 2`
         omega_f_nat_cov = torch.zeros(
-            batch_shape + torch.Size([num_optimal_samples, M, q + P, P, 2, 2]), **tkwargs
+            batch_shape + torch.Size([num_optimal_samples, M, q + P, P, 2, 2]),
+            **tkwargs,
         )
         ###########################################################################
         # RUN EP ONCE

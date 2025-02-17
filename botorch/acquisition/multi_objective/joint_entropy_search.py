@@ -43,8 +43,8 @@ class LowerBoundMultiObjectiveEntropySearch(AcquisitionFunction, MCSamplerMixin)
     def __init__(
         self,
         model: Model,
-        pareto_sets: Tensor,
-        pareto_fronts: Tensor,
+        optimal_inputs: Tensor,
+        optimal_outputs: Tensor,
         hypercell_bounds: Tensor,
         X_pending: Tensor | None = None,
         estimation_type: str = "LB",
@@ -54,9 +54,9 @@ class LowerBoundMultiObjectiveEntropySearch(AcquisitionFunction, MCSamplerMixin)
 
         Args:
             model: A fitted batch model with 'M' number of outputs.
-            pareto_sets: A `num_pareto_samples x num_pareto_points x d`-dim Tensor
+            optimal_inputs: A `num_pareto_samples x num_pareto_points x d`-dim Tensor
                 containing the sampled Pareto optimal sets of inputs.
-            pareto_fronts: A `num_pareto_samples x num_pareto_points x M`-dim Tensor
+            optimal_outputs: A `num_pareto_samples x num_pareto_points x M`-dim Tensor
                 containing the sampled Pareto optimal sets of outputs.
             hypercell_bounds:  A `num_pareto_samples x 2 x J x M`-dim Tensor
                 containing the hyper-rectangle bounds for integration, where `J` is
@@ -87,8 +87,8 @@ class LowerBoundMultiObjectiveEntropySearch(AcquisitionFunction, MCSamplerMixin)
             )
 
         self.initial_model = model
-        if (pareto_sets is not None and pareto_sets.ndim != 3) or (
-            pareto_fronts is not None and pareto_fronts.ndim != 3
+        if (optimal_inputs is not None and optimal_inputs.ndim != 3) or (
+            optimal_outputs is not None and optimal_outputs.ndim != 3
         ):
             raise UnsupportedError(
                 "The Pareto set and front should have a shape of "
@@ -97,8 +97,8 @@ class LowerBoundMultiObjectiveEntropySearch(AcquisitionFunction, MCSamplerMixin)
                 "respectively"
             )
         else:
-            self.pareto_sets = pareto_sets
-            self.pareto_fronts = pareto_fronts
+            self.optimal_inputs = optimal_inputs
+            self.optimal_outputs = optimal_outputs
 
         if hypercell_bounds.ndim != 4:
             raise UnsupportedError(
@@ -275,8 +275,8 @@ class qLowerBoundMultiObjectiveJointEntropySearch(
     def __init__(
         self,
         model: Model,
-        pareto_sets: Tensor,
-        pareto_fronts: Tensor,
+        optimal_inputs: Tensor,
+        optimal_outputs: Tensor,
         hypercell_bounds: Tensor,
         X_pending: Tensor | None = None,
         estimation_type: str = "LB",
@@ -286,9 +286,9 @@ class qLowerBoundMultiObjectiveJointEntropySearch(
 
         Args:
             model: A fitted batch model with 'M' number of outputs.
-            pareto_sets: A `num_pareto_samples x num_pareto_points x d`-dim Tensor
+            optimal_inputs: A `num_pareto_samples x num_pareto_points x d`-dim Tensor
                 containing the sampled Pareto optimal sets of inputs.
-            pareto_fronts: A `num_pareto_samples x num_pareto_points x M`-dim Tensor
+            optimal_outputs: A `num_pareto_samples x num_pareto_points x M`-dim Tensor
                 containing the sampled Pareto optimal sets of outputs.
             hypercell_bounds:  A `num_pareto_samples x 2 x J x M`-dim Tensor
                 containing the hyper-rectangle bounds for integration. In the
@@ -304,8 +304,8 @@ class qLowerBoundMultiObjectiveJointEntropySearch(
         """
         super().__init__(
             model=model,
-            pareto_sets=pareto_sets,
-            pareto_fronts=pareto_fronts,
+            optimal_inputs=optimal_inputs,
+            optimal_outputs=optimal_outputs,
             hypercell_bounds=hypercell_bounds,
             X_pending=X_pending,
             estimation_type=estimation_type,
@@ -321,12 +321,12 @@ class qLowerBoundMultiObjectiveJointEntropySearch(
         with fantasize_flag():
             with settings.propagate_grads(False):
                 _ = self.initial_model.posterior(
-                    self.pareto_sets, observation_noise=False
+                    self.optimal_inputs, observation_noise=False
                 )
             # Condition with observation noise.
             self.conditional_model = self.initial_model.condition_on_observations(
-                X=self.initial_model.transform_inputs(self.pareto_sets),
-                Y=self.pareto_fronts,
+                X=self.initial_model.transform_inputs(self.optimal_inputs),
+                Y=self.optimal_outputs,
             )
 
     def _compute_posterior_statistics(

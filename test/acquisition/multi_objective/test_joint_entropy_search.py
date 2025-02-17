@@ -95,8 +95,8 @@ class TestLowerBoundMultiObjectiveEntropySearch(BotorchTestCase):
             with self.assertRaises(NotImplementedError):
                 DummyLowerBoundMultiObjectiveEntropySearch(
                     model=model,
-                    pareto_sets=pareto_sets,
-                    pareto_fronts=pareto_fronts,
+                    optimal_inputs=pareto_sets,
+                    optimal_outputs=pareto_fronts,
                     hypercell_bounds=hypercell_bounds,
                     estimation_type=estimation_type,
                     num_samples=64,
@@ -128,8 +128,8 @@ class TestLowerBoundMultiObjectiveEntropySearch(BotorchTestCase):
             with self.assertRaises(UnsupportedError):
                 DummyLowerBoundMultiObjectiveEntropySearch(
                     model=model,
-                    pareto_sets=pareto_sets.unsqueeze(0),
-                    pareto_fronts=pareto_fronts,
+                    optimal_inputs=pareto_sets.unsqueeze(0),
+                    optimal_outputs=pareto_fronts,
                     hypercell_bounds=hypercell_bounds,
                     estimation_type=estimation_type,
                     num_samples=64,
@@ -137,8 +137,8 @@ class TestLowerBoundMultiObjectiveEntropySearch(BotorchTestCase):
             with self.assertRaises(UnsupportedError):
                 DummyLowerBoundMultiObjectiveEntropySearch(
                     model=model,
-                    pareto_sets=pareto_sets,
-                    pareto_fronts=pareto_fronts.unsqueeze(0),
+                    optimal_inputs=pareto_sets,
+                    optimal_outputs=pareto_fronts.unsqueeze(0),
                     hypercell_bounds=hypercell_bounds,
                     estimation_type=estimation_type,
                     num_samples=64,
@@ -146,8 +146,8 @@ class TestLowerBoundMultiObjectiveEntropySearch(BotorchTestCase):
             with self.assertRaises(UnsupportedError):
                 DummyLowerBoundMultiObjectiveEntropySearch(
                     model=model,
-                    pareto_sets=pareto_sets,
-                    pareto_fronts=pareto_fronts,
+                    optimal_inputs=pareto_sets,
+                    optimal_outputs=pareto_fronts,
                     hypercell_bounds=hypercell_bounds.unsqueeze(0),
                     estimation_type=estimation_type,
                     num_samples=64,
@@ -157,8 +157,8 @@ class TestLowerBoundMultiObjectiveEntropySearch(BotorchTestCase):
                 with self.assertRaises(NotImplementedError):
                     DummyLowerBoundMultiObjectiveEntropySearch(
                         model=model,
-                        pareto_sets=pareto_sets,
-                        pareto_fronts=pareto_fronts,
+                        optimal_inputs=pareto_sets,
+                        optimal_outputs=pareto_fronts,
                         hypercell_bounds=hypercell_bounds,
                         estimation_type=estimation_type,
                         num_samples=64,
@@ -166,8 +166,8 @@ class TestLowerBoundMultiObjectiveEntropySearch(BotorchTestCase):
             else:
                 DummyLowerBoundMultiObjectiveEntropySearch(
                     model=model,
-                    pareto_sets=pareto_sets,
-                    pareto_fronts=pareto_fronts,
+                    optimal_inputs=pareto_sets,
+                    optimal_outputs=pareto_fronts,
                     hypercell_bounds=hypercell_bounds,
                     estimation_type=estimation_type,
                     num_samples=64,
@@ -217,8 +217,8 @@ class TestQLowerBoundMultiObjectiveJointEntropySearch(BotorchTestCase):
             for X_pending in X_pending_list:
                 acq = qLowerBoundMultiObjectiveJointEntropySearch(
                     model=model,
-                    pareto_sets=pareto_sets,
-                    pareto_fronts=pareto_fronts,
+                    optimal_inputs=pareto_sets,
+                    optimal_outputs=pareto_fronts,
                     hypercell_bounds=hypercell_bounds,
                     estimation_type=estimation_type,
                     num_samples=64,

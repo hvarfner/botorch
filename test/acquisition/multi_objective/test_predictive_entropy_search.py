@@ -68,7 +68,7 @@ class TestQMultiObjectivePredictiveEntropySearch(BotorchTestCase):
             with self.assertRaises(NotImplementedError):
                 qMultiObjectivePredictiveEntropySearch(
                     model=model,
-                    pareto_sets=pareto_sets,
+                    optimal_inputs=pareto_sets,
                 )
 
             # test wrong Pareto set shape
@@ -87,13 +87,13 @@ class TestQMultiObjectivePredictiveEntropySearch(BotorchTestCase):
             with self.assertRaises(UnsupportedError):
                 qMultiObjectivePredictiveEntropySearch(
                     model=model,
-                    pareto_sets=pareto_sets.unsqueeze(0),
+                    optimal_inputs=pareto_sets.unsqueeze(0),
                 )
 
             with self.assertRaises(UnsupportedError):
                 qMultiObjectivePredictiveEntropySearch(
                     model=model,
-                    pareto_sets=pareto_sets.unsqueeze(-1),
+                    optimal_inputs=pareto_sets.unsqueeze(-1),
                 )
 
     def test_moo_predictive_entropy_search(self, use_model_list=False, maximize=False):
@@ -132,7 +132,7 @@ class TestQMultiObjectivePredictiveEntropySearch(BotorchTestCase):
                 X_pending = X_pending_list[i]
                 acq = qMultiObjectivePredictiveEntropySearch(
                     model=model,
-                    pareto_sets=pareto_sets,
+                    optimal_inputs=pareto_sets,
                     maximize=maximize,
                     X_pending=X_pending,
                 )
