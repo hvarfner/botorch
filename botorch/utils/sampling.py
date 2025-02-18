@@ -27,12 +27,14 @@ import numpy as np
 import numpy.typing as npt
 import scipy
 import torch
+
 from botorch.exceptions.errors import BotorchError, InfeasibilityError
 from botorch.exceptions.warnings import UserInputWarning
 from botorch.sampling.qmc import NormalQMCEngine
 from botorch.utils.transforms import unnormalize
 from scipy.spatial import Delaunay, HalfspaceIntersection
 from torch import LongTensor, Tensor
+from torch.distributions import Multinomial
 from torch.quasirandom import SobolEngine
 
 
@@ -990,10 +992,12 @@ def sparse_to_dense_constraints(
 def optimize_posterior_samples(
     paths: GenericDeterministicModel,
     bounds: Tensor,
-    raw_samples: int = 1024,
-    num_restarts: int = 20,
+    raw_samples: int = 2048,
+    num_restarts: int = 4,
     sample_transform: Callable[[Tensor], Tensor] | None = None,
     return_transformed: bool = False,
+    suggested_points: Tensor | None = None,
+    options: dict | None = None,
 ) -> tuple[Tensor, Tensor]:
     r"""Cheaply maximizes posterior samples by random querying followed by
     gradient-based optimization using SciPy's L-BFGS-B routine.
@@ -1008,6 +1012,9 @@ def optimize_posterior_samples(
             negate the objective or otherwise transform the output.
         return_transformed: A boolean indicating whether to return the transformed
             or non-transformed samples.
+        suggested_points
+        options: Options for generation of initial candidates, passed to
+            gen_batch_initial_conditions.
 
     Returns:
         A two-element tuple containing:
@@ -1015,6 +1022,7 @@ def optimize_posterior_samples(
             - f_opt: A `num_optima x [batch_size] x m`-dim, optionally
                 `num_optima x [batch_size] x 1`-dim,  tensor of optimal outputs f*.
     """
+    options = {} if options is None else options
 
     def path_func(x) -> Tensor:
         res = paths(x)
@@ -1023,21 +1031,46 @@ def optimize_posterior_samples(
 
         return res.squeeze(-1)
 
-    candidate_set = unnormalize(
-        SobolEngine(dimension=bounds.shape[1], scramble=True).draw(n=raw_samples),
-        bounds=bounds,
-    )
     # queries all samples on all candidates - output shape
     # raw_samples * num_optima * num_models
+    frac_random = options.get("frac_random", 0.9)
+    candidate_set = draw_sobol_samples(
+        bounds=bounds, n=round(raw_samples * frac_random), q=1
+    ).squeeze(-2)
+    if suggested_points is not None:
+        from botorch.optim.initializers import sample_truncated_normal_perturbations
+
+        perturbed_suggestions = sample_truncated_normal_perturbations(
+            X=suggested_points,
+            n_discrete_points=round(raw_samples * (1 - frac_random)),
+            sigma=options.get("sample_around_best_sigma", 1e-2),
+            bounds=bounds,
+        )
+        candidate_set = torch.cat((candidate_set, perturbed_suggestions))
+
     candidate_queries = path_func(candidate_set)
-    argtop_k = torch.topk(candidate_queries, num_restarts, dim=-1).indices
-    X_top_k = candidate_set[argtop_k, :]
+    weights = (
+        candidate_queries - candidate_queries.mean(dim=-1, keepdim=True)
+    ) / candidate_queries.std(dim=-1, keepdim=True)
+    eta = options.get("eta", 2.0)
+    weights = torch.exp(eta * weights)
+
+    # weights can be more than 2D, which is not supported by torch.multinomial
+    # the argsort picks out the indices that are nonzero, i.e. those that are drawn
+    # (without replacement, so we will always have num_restarts nonzero ones)
+    idx = (
+        Multinomial(num_restarts, probs=weights)
+        .sample()
+        .argsort(descending=True)[..., :num_restarts]
+    )
+
+    ics = candidate_set[idx, :]
 
     # to avoid circular import, the import occurs here
     from botorch.generation.gen import gen_candidates_scipy
 
     X_top_k, f_top_k = gen_candidates_scipy(
-        X_top_k,
+        ics,
         path_func,
         lower_bounds=bounds[0],
         upper_bounds=bounds[1],
