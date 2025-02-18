@@ -996,7 +996,7 @@ def _damped_update(
     for _ in range(len(fs[len(bs) :])):
         df = df.unsqueeze(-1)
 
-    return df * new_factor + (1 - df) * old_factor
+    return (df * new_factor + (1 - df) * old_factor).detach()
 
 
 def _update_damping(
