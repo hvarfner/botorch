@@ -56,7 +56,7 @@ def _draw_kernel_feature_paths_fallback(
     mean_module: Module | None,
     covar_module: Kernel,
     sample_shape: Size,
-    num_features: int = 1024,
+    num_features: int = 512,
     map_generator: TKernelFeatureMapGenerator = gen_kernel_features,
     input_transform: TInputTransform | None = None,
     output_transform: TOutputTransform | None = None,

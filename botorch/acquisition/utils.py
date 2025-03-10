@@ -578,12 +578,14 @@ def get_optimal_samples(
         sample_transform = None
 
     paths = get_matheron_path_model(model=model, sample_shape=torch.Size([num_optima]))
-    suggested_points = prune_inferior_points(
-        model=model,
-        X=model.train_inputs[0],
-        posterior_transform=posterior_transform,
-        objective=objective,
-    )
+    suggested_points = None
+    if len(model.train_inputs[0]) > 0: 
+        suggested_points = prune_inferior_points(
+            model=model,
+            X=model.train_inputs[0],
+            posterior_transform=posterior_transform,
+            objective=objective,
+        )
     optimal_inputs, optimal_outputs = optimize_posterior_samples(
         paths=paths,
         bounds=bounds,
