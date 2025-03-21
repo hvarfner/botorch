@@ -1852,7 +1852,7 @@ def construct_inputs_BALD(
 def construct_inputs_NIPV(
     model: Model,
     bounds: list[tuple[float, float]],
-    num_mc_points: int = 128,
+    num_mc_points: int = 512,
     X_pending: Tensor | None = None,
     posterior_transform: PosteriorTransform | None = None,
 ) -> dict[str, Any]:
