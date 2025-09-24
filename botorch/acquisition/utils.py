@@ -584,6 +584,7 @@ def get_optimal_samples(
         posterior_transform=posterior_transform,
         objective=objective,
     )
+    suggested_points = None
     optimal_inputs, optimal_outputs = optimize_posterior_samples(
         paths=paths,
         bounds=bounds,
