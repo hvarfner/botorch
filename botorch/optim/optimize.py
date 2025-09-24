@@ -193,7 +193,7 @@ class OptimizeAcqfInputs:
                 qLowerBoundMultiObjectiveJointEntropySearch,
             ),
         ):
-            return gen_optimal_input_initial_conditions
+            return gen_batch_initial_conditions
         return gen_batch_initial_conditions
 
 
